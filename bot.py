@@ -5,9 +5,9 @@ import os
 TOKEN = os.getenv("TOKEN")
 
 keyboard = [
-    ["🏢 اطلاعات شرکت", "⏰ ساعت کاری"],
-    ["🚕 ایاب و ذهاب", "🌐 شبکه های اجتماعی"],
-    ["💰 حقوق", "📞 تماس‌ها"]
+    ["🏢 اطلاعات شرکت", "🌐 شبکه های اجتماعی"],
+    ["🚕 کلید 2", "⏰ کلید 1"],
+    ["💰 کلید 3", "📞 تماس‌ها"]
 ]
 
 reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
@@ -34,11 +34,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
-    if text == "⏰ ساعت کاری":
-        await update.message.reply_text("از 7 صبح تا 18 عصر")
+    if text == "⏰ کلید 1":
+        await update.message.reply_text("کلید 1")
 
-    elif text == "🚕 ایاب و ذهاب":
-        await update.message.reply_text("سرویس داریم 🚐")
+    elif text == "🚕 کلید 2":
+        await update.message.reply_text("کلید 2 🚐")
 
     elif text == "🌐 شبکه های اجتماعی":
         await update.message.reply_text(
@@ -63,12 +63,11 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "از منو انتخاب کنید:",
             reply_markup=reply_markup
         )
+    elif text == "📞 تماس‌ با ما":
+        await update.message.reply_text("کلید 4")
 
-    elif text == "💰 حقوق":
-        await update.message.reply_text("آخر ماه واریز میشه 💵")
-
-    elif text == "📞 تماس‌ها":
-        await update.message.reply_text("داخلی 101")
+    elif text == "💰 کلید 3":
+        await update.message.reply_text("کلید 3 💵")
 
     elif text == "🏢 اطلاعات شرکت":
         await update.message.reply_text("شرکت داروسازی ایران هورمون")
