@@ -15,6 +15,14 @@ keyboard = [
     ["✉️ پیشنهادات و انتقادات", "📞 تماس‌ با ما"]
 ]
 
+menu_keyboard = ReplyKeyboardMarkup(
+    [
+        ["🏠 منو / Start"]
+    ],
+    resize_keyboard=True,
+    is_persistent=True
+)
+
 reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 social_keyboard = ReplyKeyboardMarkup(
@@ -42,11 +50,23 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=reply_markup
     )
 
+    await update.message.reply_text(
+        "برای باز کردن منو روی دکمه زیر بزن 👇",
+        reply_markup=menu_keyboard
+    )
+
 ADMIN_ID = 8040436465
 
 
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
+
+    if text == "🏠 منو / Start":
+        await update.message.reply_text(
+            "🔙 برگشت به منو",
+            reply_markup=reply_markup
+        )
+        return
 
     # ================== حالت پیشنهادات ==================
     if context.user_data.get("feedback"):
