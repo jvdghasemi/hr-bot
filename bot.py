@@ -149,7 +149,7 @@ def main():
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    MessageHandler(filters.TEXT, handle)
+    app.add_handler(MessageHandler(filters.TEXT, handle))
 
     print("NEW VERSION LOADED")
     app.run_polling()
