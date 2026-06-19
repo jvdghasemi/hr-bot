@@ -1,6 +1,7 @@
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 import os
+import jdatetime
 
 TOKEN = os.getenv("TOKEN")
 
@@ -42,26 +43,36 @@ ADMIN_ID = 8040436465
 
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
+    now = jdatetime.datetime.now()
 
-    # اگر کاربر در حال ثبت پیشنهاد باشد
+    # ثبت پیشنهادات
     if context.user_data.get("feedback"):
 
         if text == "❌ انصراف":
             context.user_data["feedback"] = False
 
             await update.message.reply_text(
-                "ثبت پیشنهاد لغو شد.",
+                "❌ ثبت پیشنهاد لغو شد.",
                 reply_markup=reply_markup
             )
             return
 
         user = update.effective_user
 
+        username = (
+            f"@{user.username}"
+            if user.username
+            else "ندارد"
+        )
+
         message = (
             f"📩 پیشنهاد/انتقاد جدید\n\n"
-            f"👤 از: {user.first_name}\n"
-            f"🆔 ID: {user.id}\n\n"
-            f"💬 متن:\n{text}"
+            f"👤 نام: {user.first_name}\n"
+            f"🔹 نام کاربری: {username}\n"
+            f"🆔 آیدی: {user.id}\n"
+            f"📅 تاریخ: {now.strftime('%Y/%m/%d')}\n"
+            f"🕒 ساعت: {now.strftime('%H:%M:%S')}\n\n"
+            f"💬 متن پیام:\n{text}"
         )
 
         await context.bot.send_message(
