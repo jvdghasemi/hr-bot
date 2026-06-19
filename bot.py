@@ -7,7 +7,7 @@ TOKEN = os.getenv("TOKEN")
 keyboard = [
     ["🏢 اطلاعات شرکت", "🌐 شبکه های اجتماعی"],
     ["🚕 کلید 2", "⏰ کلید 1"],
-    ["💰 کلید 3", "📞 تماس‌ با ما"]
+    ["✉️ پیشنهادات و انتقادات", "📞 تماس‌ با ما"]
 ]
 
 reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
@@ -23,6 +23,13 @@ social_keyboard = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
+feedback_keyboard = ReplyKeyboardMarkup(
+    [
+        ["❌ انصراف"]
+    ],
+    resize_keyboard=True
+)
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -30,9 +37,45 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=reply_markup
     )
 
+ADMIN_ID = 8040436465
+
 
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
+
+    # اگر کاربر در حال ثبت پیشنهاد باشد
+    if context.user_data.get("feedback"):
+
+        if text == "❌ انصراف":
+            context.user_data["feedback"] = False
+
+            await update.message.reply_text(
+                "ثبت پیشنهاد لغو شد.",
+                reply_markup=reply_markup
+            )
+            return
+
+        user = update.effective_user
+
+        message = (
+            f"📩 پیشنهاد/انتقاد جدید\n\n"
+            f"👤 از: {user.first_name}\n"
+            f"🆔 ID: {user.id}\n\n"
+            f"💬 متن:\n{text}"
+        )
+
+        await context.bot.send_message(
+            chat_id=ADMIN_ID,
+            text=message
+        )
+
+        await update.message.reply_text(
+            "✅ نظر شما ارسال شد. ممنون از مشارکت شما 🙏",
+            reply_markup=reply_markup
+        )
+
+        context.user_data["feedback"] = False
+        return
 
     if text == "⏰ کلید 1":
         await update.message.reply_text("کلید 1")
@@ -47,33 +90,51 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     elif text == "📷 اینستاگرام":
-        await update.message.reply_text("https://instagram.com/iranhormone?igsh=cGVycHZlN2N0dzE1")
+        await update.message.reply_text(
+            "https://instagram.com/iranhormone?igsh=cGVycHZlN2N0dzE1"
+        )
 
     elif text == "✈️ تلگرام":
-        await update.message.reply_text("https://t.me/irhormon")
+        await update.message.reply_text(
+            "https://t.me/irhormon"
+        )
 
     elif text == "🔵 لینکدین":
-        await update.message.reply_text("https://linkedin.com/company/iranhormonepharmaceuticalcompany/")
+        await update.message.reply_text(
+            "https://linkedin.com/company/iranhormonepharmaceuticalcompany/"
+        )
 
     elif text == "🟢 بله":
-        await update.message.reply_text("https://ble.ir/iranhormone")
+        await update.message.reply_text(
+            "https://ble.ir/iranhormone"
+        )
 
     elif text == "🔙 بازگشت":
         await update.message.reply_text(
             "از منو انتخاب کنید:",
             reply_markup=reply_markup
         )
+
     elif text == "📞 تماس‌ با ما":
         await update.message.reply_text("کلید 4")
 
-    elif text == "💰 کلید 3":
-        await update.message.reply_text("کلید 3 💵")
+    elif text == "✉️ پیشنهادات و انتقادات":
+        context.user_data["feedback"] = True
+
+        await update.message.reply_text(
+            "📝 لطفاً پیشنهاد یا انتقاد خود را بنویسید.",
+            reply_markup=feedback_keyboard
+        )
 
     elif text == "🏢 اطلاعات شرکت":
-        await update.message.reply_text("شرکت داروسازی ایران هورمون")
+        await update.message.reply_text(
+            "شرکت داروسازی ایران هورمون"
+        )
 
     else:
-        await update.message.reply_text("از منو انتخاب کن")
+        await update.message.reply_text(
+            "از منو انتخاب کن"
+        )
 
 
 def main():
