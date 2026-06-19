@@ -63,7 +63,8 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user = update.effective_user
 
         tehran_tz = pytz.timezone("Asia/Tehran")
-        now = datetime.now(tehran_tz)
+
+        now = datetime.now(tehran_tz).replace(tzinfo=None)
         now = jdatetime.datetime.fromgregorian(datetime=now)
 
         username = f"@{user.username}" if user.username else "ندارد"
