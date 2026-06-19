@@ -3,6 +3,7 @@ import pytz
 import jdatetime
 import asyncio
 
+from telegram import MenuButtonCommands
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 import os
@@ -46,6 +47,11 @@ feedback_keyboard = ReplyKeyboardMarkup(
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    await context.bot.set_chat_menu_button(
+        chat_id=update.effective_chat.id,
+        menu_button=MenuButtonCommands()
+    )
 
     msg = await update.message.reply_text(
         "👋 سلام\nبه دستیار منابع انسانی ایران هورمون خوش آمدی"
