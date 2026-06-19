@@ -1,7 +1,11 @@
+from datetime import datetime
+import pytz
+import jdatetime
+
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 import os
-import jdatetime
+
 
 TOKEN = os.getenv("TOKEN")
 
@@ -43,9 +47,8 @@ ADMIN_ID = 8040436465
 
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
-    now = jdatetime.datetime.now()
 
-    # ثبت پیشنهادات
+    # ================== حالت پیشنهادات ==================
     if context.user_data.get("feedback"):
 
         if text == "❌ انصراف":
@@ -59,11 +62,11 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         user = update.effective_user
 
-        username = (
-            f"@{user.username}"
-            if user.username
-            else "ندارد"
-        )
+        tehran_tz = pytz.timezone("Asia/Tehran")
+        now = datetime.now(tehran_tz)
+        now = jdatetime.datetime.fromgregorian(datetime=now)
+
+        username = f"@{user.username}" if user.username else "ندارد"
 
         message = (
             f"📩 پیشنهاد/انتقاد جدید\n\n"
@@ -88,6 +91,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["feedback"] = False
         return
 
+    # ================== منو ==================
     if text == "⏰ کلید 1":
         await update.message.reply_text("کلید 1")
 
@@ -106,9 +110,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     elif text == "✈️ تلگرام":
-        await update.message.reply_text(
-            "https://t.me/irhormon"
-        )
+        await update.message.reply_text("https://t.me/irhormon")
 
     elif text == "🔵 لینکدین":
         await update.message.reply_text(
@@ -116,9 +118,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     elif text == "🟢 بله":
-        await update.message.reply_text(
-            "https://ble.ir/iranhormone"
-        )
+        await update.message.reply_text("https://ble.ir/iranhormone")
 
     elif text == "🔙 بازگشت":
         await update.message.reply_text(
@@ -138,14 +138,10 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     elif text == "🏢 اطلاعات شرکت":
-        await update.message.reply_text(
-            "شرکت داروسازی ایران هورمون"
-        )
+        await update.message.reply_text("شرکت داروسازی ایران هورمون")
 
     else:
-        await update.message.reply_text(
-            "از منو انتخاب کن"
-        )
+        await update.message.reply_text("از منو انتخاب کن")
 
 
 def main():
