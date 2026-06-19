@@ -7,7 +7,7 @@ TOKEN = os.getenv("TOKEN")
 keyboard = [
     ["🏢 اطلاعات شرکت", "🌐 شبکه های اجتماعی"],
     ["🚕 کلید 2", "⏰ کلید 1"],
-    ["💰 کلید 3", "📞 تماس‌ها"]
+    ["💰 کلید 3", "📞 تماس‌ با ما"]
 ]
 
 reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
