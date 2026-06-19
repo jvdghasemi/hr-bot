@@ -47,16 +47,16 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     elif text == "📷 اینستاگرام":
-        await update.message.reply_text("https://instagram.com/yourpage")
+        await update.message.reply_text("https://instagram.com/iranhormone?igsh=cGVycHZlN2N0dzE1")
 
     elif text == "✈️ تلگرام":
-        await update.message.reply_text("https://t.me/yourchannel")
+        await update.message.reply_text("https://t.me/irhormon")
 
-    elif text == "🟢 روبیکا":
-        await update.message.reply_text("https://rubika.ir/yourpage")
+    elif text == "🔵 لینکدین":
+        await update.message.reply_text("https://linkedin.com/company/iranhormonepharmaceuticalcompany/")
 
-    elif text == "🔵 بله":
-        await update.message.reply_text("https://ble.ir/yourpage")
+    elif text == "🟢 بله":
+        await update.message.reply_text("https://ble.ir/iranhormone")
 
     elif text == "🔙 بازگشت":
         await update.message.reply_text(
