@@ -2,31 +2,35 @@ from datetime import datetime
 import pytz
 import jdatetime
 import asyncio
-
-from telegram import MenuButtonCommands
-from telegram import Update, ReplyKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 import os
+
+from telegram import (
+    Update,
+    ReplyKeyboardMarkup,
+    MenuButtonCommands
+)
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    filters,
+    ContextTypes
+)
 
 
 TOKEN = os.getenv("TOKEN")
+ADMIN_ID = 8040436465
 
+# ================== منو اصلی ==================
 keyboard = [
     ["🏢 اطلاعات شرکت", "🌐 شبکه های اجتماعی"],
     ["🚕 کلید 2", "⏰ کلید 1"],
     ["✉️ پیشنهادات و انتقادات", "📞 تماس‌ با ما"]
 ]
 
-menu_keyboard = ReplyKeyboardMarkup(
-    [
-        ["🏠 منو / Start"]
-    ],
-    resize_keyboard=True,
-    is_persistent=True
-)
-
 reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
+# ================== شبکه اجتماعی ==================
 social_keyboard = ReplyKeyboardMarkup(
     [
         ["📷 اینستاگرام"],
@@ -38,16 +42,17 @@ social_keyboard = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
+# ================== پیشنهادات ==================
 feedback_keyboard = ReplyKeyboardMarkup(
-    [
-        ["❌ انصراف"]
-    ],
+    [["❌ انصراف"]],
     resize_keyboard=True
 )
 
 
+# ================== START ==================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
+    # فعال کردن منوی تلگرام (سنجاق)
     await context.bot.set_chat_menu_button(
         chat_id=update.effective_chat.id,
         menu_button=MenuButtonCommands()
@@ -57,13 +62,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "👋 سلام\nبه دستیار منابع انسانی ایران هورمون خوش آمدی"
     )
 
-    # 2 ثانیه صبر
     await asyncio.sleep(2)
-
-    # پاک کردن پیام سلام
     await msg.delete()
 
-    # دکمه ورود به منو
     await update.message.reply_text(
         "👇 برای ورود به منو روی دکمه زیر بزن",
         reply_markup=ReplyKeyboardMarkup(
@@ -72,12 +73,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     )
 
-ADMIN_ID = 8040436465
 
-
+# ================== HANDLE ==================
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
+    # ===== ورود =====
     if text == "🚀 ورود به منو":
         msg = await update.message.reply_text(
             "🔓 وارد منو شدی",
@@ -88,9 +89,10 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.delete()
         return
 
+    # ===== بازگشت =====
     if text == "🏠 منو / Start":
         await update.message.reply_text(
-            "✅ ورود به منو",
+            "🔙 برگشت به منو",
             reply_markup=reply_markup
         )
         return
@@ -102,7 +104,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data["feedback"] = False
 
             await update.message.reply_text(
-                "❌ ثبت پیشنهاد لغو شد.",
+                "❌ لغو شد",
                 reply_markup=reply_markup
             )
             return
@@ -110,8 +112,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user = update.effective_user
 
         tehran_tz = pytz.timezone("Asia/Tehran")
-
-        now = datetime.now(tehran_tz).replace(tzinfo=None)
+        now = datetime.now(tehran_tz)
         now = jdatetime.datetime.fromgregorian(datetime=now)
 
         username = f"@{user.username}" if user.username else "ندارد"
@@ -119,11 +120,11 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message = (
             f"📩 پیشنهاد/انتقاد جدید\n\n"
             f"👤 نام: {user.first_name}\n"
-            f"🔹 نام کاربری: {username}\n"
+            f"🔹 یوزرنیم: {username}\n"
             f"🆔 آیدی: {user.id}\n"
             f"📅 تاریخ: {now.strftime('%Y/%m/%d')}\n"
             f"🕒 ساعت: {now.strftime('%H:%M:%S')}\n\n"
-            f"💬 متن پیام:\n{text}"
+            f"💬 متن:\n{text}"
         )
 
         await context.bot.send_message(
@@ -132,7 +133,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         await update.message.reply_text(
-            "✅ نظر شما ارسال شد. ممنون از مشارکت شما 🙏",
+            "✅ ارسال شد 🙏",
             reply_markup=reply_markup
         )
 
@@ -148,14 +149,12 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif text == "🌐 شبکه های اجتماعی":
         await update.message.reply_text(
-            "یکی از شبکه‌ها را انتخاب کنید:",
+            "یکی رو انتخاب کن:",
             reply_markup=social_keyboard
         )
 
     elif text == "📷 اینستاگرام":
-        await update.message.reply_text(
-            "https://instagram.com/iranhormone?igsh=cGVycHZlN2N0dzE1"
-        )
+        await update.message.reply_text("https://instagram.com/iranhormone")
 
     elif text == "✈️ تلگرام":
         await update.message.reply_text("https://t.me/irhormon")
@@ -170,7 +169,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif text == "🔙 بازگشت":
         await update.message.reply_text(
-            "از منو انتخاب کنید:",
+            "برگشتی به منو",
             reply_markup=reply_markup
         )
 
@@ -181,7 +180,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["feedback"] = True
 
         await update.message.reply_text(
-            "📝 لطفاً پیشنهاد یا انتقاد خود را بنویسید.",
+            "📝 پیامتو بنویس یا انصراف بزن",
             reply_markup=feedback_keyboard
         )
 
@@ -192,13 +191,14 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("از منو انتخاب کن")
 
 
+# ================== MAIN ==================
 def main():
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT, handle))
 
-    print("NEW VERSION LOADED")
+    print("BOT RUNNING...")
     app.run_polling()
 
 
