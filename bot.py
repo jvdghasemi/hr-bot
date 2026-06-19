@@ -1,6 +1,7 @@
 from datetime import datetime
 import pytz
 import jdatetime
+import asyncio
 
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
@@ -45,14 +46,24 @@ feedback_keyboard = ReplyKeyboardMarkup(
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "👋 سلام\nبه دستیار منابع انسانی ایران هورمون خوش آمدی",
-        reply_markup=reply_markup
+
+    msg = await update.message.reply_text(
+        "👋 سلام\nبه دستیار منابع انسانی ایران هورمون خوش آمدی"
     )
 
+    # 2 ثانیه صبر
+    await asyncio.sleep(2)
+
+    # پاک کردن پیام سلام
+    await msg.delete()
+
+    # دکمه ورود به منو
     await update.message.reply_text(
-        "برای باز کردن منو روی دکمه زیر بزن 👇",
-        reply_markup=menu_keyboard
+        "👇 برای ورود به منو روی دکمه زیر بزن",
+        reply_markup=ReplyKeyboardMarkup(
+            [["🚀 ورود به منو"]],
+            resize_keyboard=True
+        )
     )
 
 ADMIN_ID = 8040436465
@@ -61,9 +72,19 @@ ADMIN_ID = 8040436465
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
+    if text == "🚀 ورود به منو":
+        msg = await update.message.reply_text(
+            "🔓 وارد منو شدی",
+            reply_markup=reply_markup
+        )
+
+        await asyncio.sleep(2)
+        await msg.delete()
+        return
+
     if text == "🏠 منو / Start":
         await update.message.reply_text(
-            "🔙 برگشت به منو",
+            "✅ ورود به منو",
             reply_markup=reply_markup
         )
         return
