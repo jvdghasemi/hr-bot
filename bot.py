@@ -185,6 +185,9 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "🌐 وب‌سایت:\n"
             "https://www.iranhormone.ir\n\n"
 
+            "📧 پست الکترونیک:\n"
+            "info@iranhormone.com\n\n"
+
             "☎️ تلفن:\n"
             "02144905517\n\n"
 
@@ -197,7 +200,6 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "📮 کد پستی:\n"
             "1399813611"
         )
-
     elif text == "✉️ پیشنهادات و انتقادات":
 
         context.user_data["feedback"] = True
