@@ -186,7 +186,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "تهران، کیلومتر ۱۱ جاده مخصوص کرج، شرکت داروسازی ایران هورمون\n\n"
 
             "👇 نمایش مکان در Google Maps\n"
-            "🗺️ https://goo.gl/app/maps/ouWmunoPZmynVQGP8?_nr=\n\n"
+            "🗺️ https://goo.gl/app/maps/ouWmunoPZmynVQGP8?_nr\n\n"
 
             "👇 نمایش مکان در نشان\n"
             "📍https://nshn.ir/1a_bvHRNPxjnFM"
