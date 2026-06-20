@@ -52,19 +52,13 @@ feedback_keyboard = ReplyKeyboardMarkup(
 # ================== START ==================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    await update.message.reply_text(
-        "👋 سلام\n",
-        reply_markup=ReplyKeyboardMarkup(
-            [["🚀 Start / Menu"]],
-            resize_keyboard=True
-        )
-    )
-    # فعال کردن منوی تلگرام (سنجاق)
+    # فعال کردن منوی سنجاق
     await context.bot.set_chat_menu_button(
         chat_id=update.effective_chat.id,
         menu_button=MenuButtonCommands()
     )
 
+    # فقط 1 پیام
     msg = await update.message.reply_text(
         "👋 سلام\nبه دستیار منابع انسانی ایران هورمون خوش آمدی"
     )
@@ -72,16 +66,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await asyncio.sleep(2)
     await msg.delete()
 
+    # فقط دکمه ورود
     await update.message.reply_text(
-        "👇 سلام برای ورود به منو روی دکمه زیر بزن",
+        "👇 برای ورود به منو روی دکمه زیر بزن",
         reply_markup=ReplyKeyboardMarkup(
-            [["🚀 ورود به منو"]],
+            [["🚀 Start / Menu"]],
             resize_keyboard=True
         )
     )
 
-
 # ================== HANDLE ==================
+
+
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
