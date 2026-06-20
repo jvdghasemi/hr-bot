@@ -52,6 +52,13 @@ feedback_keyboard = ReplyKeyboardMarkup(
 # ================== START ==================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
+    await update.message.reply_text(
+        "👋 سلام\nبرای ورود به منو دکمه زیر رو بزن",
+        reply_markup=ReplyKeyboardMarkup(
+            [["🚀 Start / Menu"]],
+            resize_keyboard=True
+        )
+    )
     # فعال کردن منوی تلگرام (سنجاق)
     await context.bot.set_chat_menu_button(
         chat_id=update.effective_chat.id,
@@ -78,25 +85,21 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
-    # ===== ورود =====
-    if text == "🚀 ورود به منو":
-        msg = await update.message.reply_text(
+    # ================= ورود به منو =================
+    if text == "🚀 Start / Menu":
+        await update.message.reply_text(
             "🔓 وارد منو شدی",
             reply_markup=reply_markup
         )
-
-        await asyncio.sleep(2)
-        await msg.delete()
         return
 
-    # ===== بازگشت =====
+    # ================= بازگشت همیشه =================
     if text == "🏠 منو / Start":
         await update.message.reply_text(
-            "🔙 برگشت به منو",
+            "🔙 منو فعال شد",
             reply_markup=reply_markup
         )
         return
-
     # ================== حالت پیشنهادات ==================
     if context.user_data.get("feedback"):
 
