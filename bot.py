@@ -183,7 +183,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "📞 اطلاعات تماس شرکت داروسازی ایران هورمون\n\n"
 
             "🌐 وب‌سایت:\n"
-            "https://www.iranhormone.com\n\n"
+            "https://www.iranhormone.ir\n\n"
 
             "☎️ تلفن:\n"
             "02144905517\n\n"
