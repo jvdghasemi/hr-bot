@@ -53,7 +53,7 @@ feedback_keyboard = ReplyKeyboardMarkup(
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
-        "👋 سلام\nبرای ورود به منو دکمه زیر رو بزن",
+        "👋 سلام\n",
         reply_markup=ReplyKeyboardMarkup(
             [["🚀 Start / Menu"]],
             resize_keyboard=True
@@ -73,7 +73,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await msg.delete()
 
     await update.message.reply_text(
-        "👇 برای ورود به منو روی دکمه زیر بزن",
+        "👇 سلام برای ورود به منو روی دکمه زیر بزن",
         reply_markup=ReplyKeyboardMarkup(
             [["🚀 ورود به منو"]],
             resize_keyboard=True
