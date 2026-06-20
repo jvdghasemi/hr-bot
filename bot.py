@@ -178,12 +178,8 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif text == "📞 تماس‌ با ما":
 
-        await update.message.reply_location(
-            latitude=35.7150638,
-            longitude=51.2152401
-        )
-
         await update.message.reply_text(
+
             "📞 اطلاعات تماس شرکت داروسازی ایران هورمون\n\n"
 
             "🌐 وب‌سایت:\n"
@@ -194,9 +190,6 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             "📍 آدرس:\n"
             "تهران، کیلومتر ۱۱ جاده مخصوص کرج، شرکت داروسازی ایران هورمون\n\n"
-
-            "👇 نمایش مکان در Google Maps\n"
-            "🗺️ https://goo.gl/app/maps/ouWmunoPZmynVQGP8?_nr\n\n"
 
             "👇 نمایش مکان در نشان\n"
             "📍 https://nshn.ir/1a_bvHRNPxjnFM\n\n"
