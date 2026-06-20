@@ -179,7 +179,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["feedback"] = True
 
         await update.message.reply_text(
-            "📝 پیامتو بنویس یا انصراف بزن",
+            "📝 لطفا پیشنهاد و یا انتقاد خود را بنویسید",
             reply_markup=feedback_keyboard
         )
 
