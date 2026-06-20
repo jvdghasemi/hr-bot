@@ -180,7 +180,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.reply_text(
 
-            "📞 اطلاعات تماس شرکت داروسازی ایران هورمون\n\n"
+            "📞 راه های ارتباطی شرکت داروسازی ایران هورمون\n\n"
 
             "🌐 وب‌سایت:\n"
             "https://www.iranhormone.ir\n\n"
