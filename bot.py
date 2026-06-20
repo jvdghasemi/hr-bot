@@ -173,7 +173,23 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     elif text == "📞 تماس‌ با ما":
-        await update.message.reply_text("کلید 4")
+        await update.message.reply_text(
+            "📞 اطلاعات تماس شرکت داروسازی ایران هورمون\n\n"
+            "🌐 وب‌سایت:\n"
+            "https://www.iranhormone.ir\n\n"
+
+            "📧 ایمیل:\n"
+            "info@iranhormone.com\n\n"
+
+            "☎️ تلفن:\n"
+            "021-44905517\n\n"
+
+            "📍 آدرس:\n"
+            "تهران، کیلومتر 11 جاده مخصوص کرج\n\n"
+
+            "📮 کد پستی:\n"
+            "1399813611"
+        )
 
     elif text == "✉️ پیشنهادات و انتقادات":
         context.user_data["feedback"] = True
