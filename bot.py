@@ -172,7 +172,17 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=reply_markup
         )
 
+# این نسخه فقط بخش‌های خراب رو بازنویسی می‌کند.
+# همه چیز از elif text == "📞 تماس‌ با ما": تا آخر handle خراب شده
+# داخل تابع handle دقیقا این بخش را جایگزین کن
+
     elif text == "📞 تماس‌ با ما":
+
+        await update.message.reply_location(
+            latitude=35.7150638,
+            longitude=51.2152401
+        )
+
         await update.message.reply_text(
             "📞 اطلاعات تماس شرکت داروسازی ایران هورمون\n\n"
 
@@ -189,13 +199,14 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "🗺️ https://goo.gl/app/maps/ouWmunoPZmynVQGP8?_nr\n\n"
 
             "👇 نمایش مکان در نشان\n"
-            "📍https://nshn.ir/1a_bvHRNPxjnFM"
+            "📍 https://nshn.ir/1a_bvHRNPxjnFM\n\n"
 
             "📮 کد پستی:\n"
             "1399813611"
         )
 
     elif text == "✉️ پیشنهادات و انتقادات":
+
         context.user_data["feedback"] = True
 
         await update.message.reply_text(
@@ -204,20 +215,28 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     elif text == "🏢 اطلاعات شرکت":
-        await update.message.reply_text("شرکت داروسازی ایران هورمون")
+
+        await update.message.reply_text(
+            "شرکت داروسازی ایران هورمون"
+        )
 
     else:
-        await update.message.reply_text("از منو انتخاب کن")
+        await update.message.reply_text(
+            "از منو انتخاب کن"
+        )
 
 
 # ================== MAIN ==================
+
 def main():
+
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT, handle))
 
     print("BOT RUNNING...")
+
     app.run_polling()
 
 
