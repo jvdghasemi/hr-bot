@@ -175,17 +175,21 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif text == "📞 تماس‌ با ما":
         await update.message.reply_text(
             "📞 اطلاعات تماس شرکت داروسازی ایران هورمون\n\n"
-            "🌐 وب‌سایت:\n"
-            "https://www.iranhormone.ir\n\n"
 
-            "📧 ایمیل:\n"
-            "info@iranhormone.com\n\n"
+            "🌐 وب‌سایت:\n"
+            "https://www.iranhormone.com\n\n"
 
             "☎️ تلفن:\n"
-            "021-44905517\n\n"
+            "02144905517\n\n"
 
             "📍 آدرس:\n"
-            "تهران، کیلومتر 11 جاده مخصوص کرج\n\n"
+            "تهران، کیلومتر ۱۱ جاده مخصوص کرج، شرکت داروسازی ایران هورمون\n\n"
+
+            "👇 نمایش مکان در Google Maps\n"
+            "🗺️ https://maps.app.goo.gl/cU5DVMYqtrxmrXtb7\n\n"
+
+            "👇 نمایش مکان در نشان\n"
+            "📍https://nshn.ir/1a_bvHRNPxjnFM"
 
             "📮 کد پستی:\n"
             "1399813611"
