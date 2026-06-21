@@ -131,6 +131,14 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         context.user_data["phone"] = text
 
+        phone = text.strip()
+
+        if not (phone.isdigit() and len(phone) == 11):
+            await update.message.reply_text(
+                "❌ شماره تلفن نامعتبر است.\n\nلطفاً یک شماره ۱۱ رقمی وارد کنید."
+            )
+            return
+
         message = f"""{name}
 
 با سلام
