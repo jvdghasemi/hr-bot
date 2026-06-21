@@ -307,11 +307,24 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif text == "📞 تماس‌ با ما":
         await update.message.reply_text(
             "📞 راه های ارتباطی شرکت داروسازی ایران هورمون\n\n"
-            "🌐 وب‌سایت:\nhttps://www.iranhormone.ir\n\n"
-            "📧 info@iranhormone.com\n\n"
-            "☎️ 02144905517\n\n"
-            "📍 تهران\n\n"
-            "📮 1399813611"
+
+            "🌐 وب‌سایت:\n"
+            "https://www.iranhormone.ir\n\n"
+
+            "📧 پست الکترونیک:\n"
+            "info@iranhormone.com\n\n"
+
+            "☎️ تلفن:\n"
+            "02144905517\n\n"
+
+            "📍 آدرس:\n\n"
+            "تهران، کیلومتر ۱۱ جاده مخصوص کرج، شرکت داروسازی ایران هورمون\n\n"
+
+            "👇 نمایش مکان در نشان\n"
+            " https://nshn.ir/1a_bvHRNPxjnFM\n\n"
+
+            "📮 کد پستی:\n"
+            "1399813611"
         )
 
     elif text == "🧑‍💼 پیام عدم تأیید مصاحبه":
