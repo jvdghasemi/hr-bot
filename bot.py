@@ -29,10 +29,10 @@ keyboard = [
 ]
 
 admin_keyboard = [
+    ["📢 ارسال پیامک"],
     ["❓ سوالات پر تکرار", "🌐 شبکه های اجتماعی"],
     ["📝 پیام مدیر عامل", "🤝 فرصت های شغلی"],
     ["✉️ پیشنهادات و انتقادات", "📞 تماس‌ با ما"],
-    ["🎉 ارسال پیام خوشامدگویی"]
 ]
 
 # ================== کیبوردها ==================
@@ -51,6 +51,18 @@ feedback_keyboard = ReplyKeyboardMarkup(
     [["❌ انصراف"]],
     resize_keyboard=True
 )
+
+
+sms_keyboard = ReplyKeyboardMarkup(
+    [
+        ["📩 ارسال پیام معمولی"],
+        ["🧑‍💼 پیام عدم تأیید مصاحبه"],
+        ["📊 پیام دعوت به مصاحبه"],
+        ["🔙 بازگشت"]
+    ],
+    resize_keyboard=True
+)
+
 
 cancel_keyboard = ReplyKeyboardMarkup(
     [["❌ انصراف"]],
@@ -237,6 +249,37 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "1399813611"
         )
 
+    elif text == "🧑‍💼 پیام عدم تأیید مصاحبه":
+
+        message = """جناب آقای/ سرکار خانم ......
+
+با سلام
+
+از حضور شما در جلسه مصاحبه شرکت داروسازی ایران هورمون سپاسگزاریم.
+
+در حال حاضر اولویت های مجموعه ما با شرایط شما متفاوت است.
+رزومه شما در بانک اطلاعاتی ما حفظ خواهد شد و در صورت ایجاد فرصت های شغلی متناسب با مهارت های شما با شما تماس خواهیم گرفت.
+"""
+
+        await update.message.reply_text(message)
+
+    elif text == "📢 ارسال پیامک":
+        context.user_data["sms_menu"] = True
+
+        await update.message.reply_text(
+            "نوع پیام را انتخاب کنید:",
+            reply_markup=sms_keyboard
+        )
+
+    elif text == "🔙 بازگشت":
+        context.user_data["sms_menu"] = False
+
+        markup = admin_markup if user_id in ADMIN_ID else user_markup
+
+        await update.message.reply_text(
+            "برگشت به منو",
+            reply_markup=markup
+        )
     elif text == "✉️ پیشنهادات و انتقادات":
         context.user_data["feedback"] = True
         await update.message.reply_text("📝 لطفا پیشنهاد و یا انتقاد خود را بنویسید", reply_markup=feedback_keyboard)
