@@ -18,7 +18,7 @@ from telegram.ext import (
 )
 
 TOKEN = os.getenv("TOKEN")
-ADMIN_ID = 8040436465
+ADMIN_ID = 7186618503
 
 # ================== منو اصلی ==================
 keyboard = [
@@ -118,38 +118,70 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["name"] = text
         context.user_data["step"] = "get_phone"
 
-        await update.message.reply_text("📱 شماره تلفن را وارد کنید:")
+        await update.message.reply_text(
+            "📱 شماره تلفن مصاحبه‌شونده را وارد کنید:"
+        )
+
         return
 
-    # مرحله گرفتن شماره + ساخت پیام
+    # مرحله گرفتن شماره + ساخت پیش نمایش
     if context.user_data.get("step") == "get_phone":
 
         name = context.user_data["name"]
-        phone = text
 
-        context.user_data["phone"] = phone
-        context.user_data["step"] = "preview"
+        context.user_data["phone"] = text
 
-        message = f"""جناب آقای/ سرکار خانم {name}
+        message = f"""{name}
 
 با سلام
 
 از حضور شما در جلسه مصاحبه شرکت داروسازی ایران هورمون سپاسگزاریم.
 
 در حال حاضر اولویت های مجموعه ما با شرایط شما متفاوت است.
-رزومه شما در بانک اطلاعاتی ما حفظ خواهد شد و در صورت ایجاد فرصت های شغلی متناسب با مهارت های شما با شما تماس خواهیم گرفت.
 
-📱 تماس: {phone}
+رزومه شما در بانک اطلاعاتی ما حفظ خواهد شد و در صورت ایجاد فرصت های شغلی متناسب با مهارت های شما با شما تماس خواهیم گرفت.
 """
 
         context.user_data["final_message"] = message
+        context.user_data["step"] = "preview"
 
         await update.message.reply_text(
-            "📌 پیش‌نمایش پیام:\n\n" + message,
+
+            "📌 پیش‌نمایش پیام\n\n"
+            + message,
+
             reply_markup=confirm_keyboard
+
         )
+
         return
 
+    # تایید ارسال
+    if text == "✅ ارسال":
+
+        if context.user_data.get("step") == "preview":
+
+            await update.message.reply_text(
+                "✅ پیام ارسال شد"
+            )
+
+            context.user_data.clear()
+
+            return
+
+    # لغو ارسال
+    if text == "❌ لغو":
+
+        if context.user_data.get("step") == "preview":
+
+            context.user_data.clear()
+
+            await update.message.reply_text(
+                "❌ ارسال لغو شد",
+                reply_markup=get_markup(user_id)
+            )
+
+            return
     # ---------- ورود ----------
     if text == "🚀 Start / Menu":
         markup = admin_markup if user_id == ADMIN_ID else user_markup
@@ -283,17 +315,13 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif text == "🧑‍💼 پیام عدم تأیید مصاحبه":
 
-        message = """جناب آقای/ سرکار خانم ......
+        context.user_data["step"] = "get_name"
 
-با سلام
+        await update.message.reply_text(
+            "👤 نام مصاحبه‌شونده را وارد کنید:"
+        )
 
-از حضور شما در جلسه مصاحبه شرکت داروسازی ایران هورمون سپاسگزاریم.
-
-در حال حاضر اولویت های مجموعه ما با شرایط شما متفاوت است.
-رزومه شما در بانک اطلاعاتی ما حفظ خواهد شد.
-"""
-
-        await update.message.reply_text(message)
+        return
 
     elif text == "📢 ارسال پیامک":
         context.user_data["sms_menu"] = True
