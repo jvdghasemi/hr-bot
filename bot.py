@@ -28,9 +28,14 @@ keyboard = [
     ["✉️ پیشنهادات و انتقادات", "📞 تماس‌ با ما"]
 ]
 
-reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+admin_keyboard = [
+    ["❓ سوالات پر تکرار", "🌐 شبکه های اجتماعی"],
+    ["📝 پیام مدیر عامل", "🤝 فرصت های شغلی"],
+    ["✉️ پیشنهادات و انتقادات", "📞 تماس‌ با ما"],
+    ["🎉 ارسال پیام خوشامدگویی"]
+]
 
-# ================== شبکه اجتماعی ==================
+# ================== کیبوردها ==================
 social_keyboard = ReplyKeyboardMarkup(
     [
         ["📷 اینستاگرام"],
@@ -42,7 +47,6 @@ social_keyboard = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
-# ================== پیشنهادات ==================
 feedback_keyboard = ReplyKeyboardMarkup(
     [["❌ انصراف"]],
     resize_keyboard=True
@@ -53,26 +57,29 @@ cancel_keyboard = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
+user_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+admin_markup = ReplyKeyboardMarkup(admin_keyboard, resize_keyboard=True)
+
 # ================== START ==================
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    # فعال کردن منوی سنجاق
     await context.bot.set_chat_menu_button(
         chat_id=update.effective_chat.id,
         menu_button=MenuButtonCommands()
     )
 
-    # فقط 1 پیام
     msg = await update.message.reply_text(
         "👋 سلام\nبه دستیار منابع انسانی ایران هورمون خوش آمدی"
     )
 
-    await asyncio.sleep(2)
-    await msg.delete()
+    await asyncio.sleep(1)
+    try:
+        await msg.delete()
+    except:
+        pass
 
-    # فقط دکمه ورود
     await update.message.reply_text(
         "👇 برای ورود به منو روی دکمه زیر بزن",
         reply_markup=ReplyKeyboardMarkup(
@@ -86,39 +93,40 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
+    user_id = update.effective_user.id
 
-    # ================= ورود به منو =================
+    # ---------- ورود ----------
     if text == "🚀 Start / Menu":
+        markup = admin_markup if user_id == ADMIN_ID else user_markup
+
         await update.message.reply_text(
             "🔓 وارد منو شدی",
-            reply_markup=reply_markup
+            reply_markup=markup
         )
         return
 
-    # ================= بازگشت همیشه =================
+    # ---------- بازگشت ----------
     if text == "🏠 منو / Start":
+        markup = admin_markup if user_id == ADMIN_ID else user_markup
+
         await update.message.reply_text(
             "🔙 منو فعال شد",
-            reply_markup=reply_markup
+            reply_markup=markup
         )
         return
-    # ================== حالت پیشنهادات ==================
+
+    # ================== پیشنهادات ==================
     if context.user_data.get("feedback"):
 
         if text == "❌ انصراف":
             context.user_data["feedback"] = False
-
-            await update.message.reply_text(
-                "❌ لغو شد",
-                reply_markup=reply_markup
-            )
+            await update.message.reply_text("❌ لغو شد", reply_markup=user_markup)
             return
 
         user = update.effective_user
 
-        tehran_tz = pytz.timezone("Asia/Tehran")
-        now = datetime.now(tehran_tz)
-        now = jdatetime.datetime.fromgregorian(datetime=now)
+        tehran = pytz.timezone("Asia/Tehran")
+        now = jdatetime.datetime.fromgregorian(datetime=datetime.now(tehran))
 
         username = f"@{user.username}" if user.username else "ندارد"
 
@@ -132,30 +140,19 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"💬 متن:\n{text}"
         )
 
-        await context.bot.send_message(
-            chat_id=ADMIN_ID,
-            text=message
-        )
+        await context.bot.send_message(chat_id=ADMIN_ID, text=message)
 
-        await update.message.reply_text(
-            "✅ ارسال شد 🙏",
-            reply_markup=reply_markup
-        )
+        await update.message.reply_text("✅ ارسال شد 🙏", reply_markup=user_markup)
 
         context.user_data["feedback"] = False
         return
 
-    # ================= خوشامدگویی =================
-
+    # ================== خوشامدگویی ==================
     if context.user_data.get("get_name"):
 
         if text == "❌ انصراف":
             context.user_data.clear()
-
-            await update.message.reply_text(
-                "❌ عملیات لغو شد.",
-                reply_markup=reply_markup
-            )
+            await update.message.reply_text("❌ لغو شد", reply_markup=admin_markup)
             return
 
         context.user_data["employee_name"] = text
@@ -163,7 +160,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["get_phone"] = True
 
         await update.message.reply_text(
-            "📱 شماره موبایل کارمند را وارد کنید:",
+            "📱 شماره موبایل را وارد کنید:",
             reply_markup=cancel_keyboard
         )
         return
@@ -172,11 +169,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if text == "❌ انصراف":
             context.user_data.clear()
-
-            await update.message.reply_text(
-                "❌ عملیات لغو شد.",
-                reply_markup=reply_markup
-            )
+            await update.message.reply_text("❌ لغو شد", reply_markup=user_markup)
             return
 
         name = context.user_data["employee_name"]
@@ -185,13 +178,12 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.clear()
 
         await update.message.reply_text(
-            f"✅ پیام خوشامدگویی ارسال شد.\n\n"
-            f"👤 نام: {name}\n"
-            f"📱 شماره: {phone}",
-            reply_markup=reply_markup
+            f"✅ پیام خوشامدگویی ثبت شد.\n\n👤 {name}\n📱 {phone}",
+            reply_markup=user_markup
         )
+        return
 
-        return    # ================== منو ==================
+    # ================== منو ==================
     if text == "🤝 فرصت های شغلی":
         await update.message.reply_text("کلید 1")
 
@@ -199,10 +191,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("کلید 2 🚐")
 
     elif text == "🌐 شبکه های اجتماعی":
-        await update.message.reply_text(
-            "یکی رو انتخاب کن:",
-            reply_markup=social_keyboard
-        )
+        await update.message.reply_text("یکی رو انتخاب کن:", reply_markup=social_keyboard)
 
     elif text == "📷 اینستاگرام":
         await update.message.reply_text("https://instagram.com/iranhormone")
@@ -216,83 +205,43 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     elif text == "🟢 بله":
-        await update.message.reply_text("https://ble.ir/iranhormone")
+        await update.message.reply_text("https://ble.ir/iranhormon")
 
     elif text == "🔙 بازگشت":
-        await update.message.reply_text(
-            "برگشتی به منو",
-            reply_markup=reply_markup
-        )
-
-# این نسخه فقط بخش‌های خراب رو بازنویسی می‌کند.
-# همه چیز از elif text == "📞 تماس‌ با ما": تا آخر handle خراب شده
-# داخل تابع handle دقیقا این بخش را جایگزین کن
+        await update.message.reply_text("برگشتی به منو", reply_markup=user_markup)
 
     elif text == "📞 تماس‌ با ما":
-
         await update.message.reply_text(
-
-            "📞 راه های ارتباطی شرکت داروسازی ایران هورمون\n\n"
-
-            "🌐 وب‌سایت:\n"
-            "https://www.iranhormone.ir\n\n"
-
-            "📧 پست الکترونیک:\n"
-            "info@iranhormone.com\n\n"
-
-            "☎️ تلفن:\n"
-            "02144905517\n\n"
-
-            "📍 آدرس:\n\n"
-            "تهران، کیلومتر ۱۱ جاده مخصوص کرج، شرکت داروسازی ایران هورمون\n\n"
-
-            "👇 نمایش مکان در نشان\n"
-            " https://nshn.ir/1a_bvHRNPxjnFM\n\n"
-
-            "📮 کد پستی:\n"
-            "1399813611"
+            "📞 ارتباط با ایران هورمون\n\n"
+            "🌐 https://www.iranhormone.ir\n"
+            "📧 info@iranhormone.com\n"
+            "☎️ 02144905517\n"
+            "📍 تهران، جاده مخصوص کرج\n"
         )
+
     elif text == "✉️ پیشنهادات و انتقادات":
-
         context.user_data["feedback"] = True
-
-        await update.message.reply_text(
-            "📝 لطفا پیشنهاد و یا انتقاد خود را بنویسید",
-            reply_markup=feedback_keyboard
-        )
+        await update.message.reply_text("📝 متن خود را بنویسید", reply_markup=feedback_keyboard)
 
     elif text == "🎉 ارسال پیام خوشامدگویی":
-
         context.user_data["get_name"] = True
+        await update.message.reply_text("👤 نام کارمند:", reply_markup=cancel_keyboard)
 
-        await update.message.reply_text(
-            "👤 نام کارمند جدید را وارد کنید:",
-            reply_markup=cancel_keyboard
-        )
-
-    elif text == "🏢 اطلاعات شرکت":
-
-        await update.message.reply_text(
-            "شرکت داروسازی ایران هورمون"
-        )
+    elif text == "❓ سوالات پر تکرار":
+        await update.message.reply_text("شرکت داروسازی ایران هورمون")
 
     else:
-        await update.message.reply_text(
-            "از منو انتخاب کن"
-        )
+        await update.message.reply_text("از منو انتخاب کن")
 
 
 # ================== MAIN ==================
-
 def main():
-
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT, handle))
 
     print("BOT RUNNING...")
-
     app.run_polling()
 
 
