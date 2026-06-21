@@ -161,11 +161,12 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if context.user_data.get("step") == "preview":
 
-            await update.message.reply_text(
-                "✅ پیام ارسال شد"
-            )
-
             context.user_data.clear()
+
+            await update.message.reply_text(
+                "✅ پیام ارسال شد",
+                reply_markup=get_markup(user_id)
+            )
 
             return
 
