@@ -23,8 +23,8 @@ ADMIN_ID = 8040436465
 
 # ================== منو اصلی ==================
 keyboard = [
-    ["🏢 اطلاعات شرکت", "🌐 شبکه های اجتماعی"],
-    ["🚕 کلید 2", "⏰ کلید 1"],
+    ["❓ سوالات پر تکرار", "🌐 شبکه های اجتماعی"],
+    ["📝 پیام مدیر عامل", "🤝 فرصت های شغلی"],
     ["✉️ پیشنهادات و انتقادات", "📞 تماس‌ با ما"]
 ]
 
@@ -48,8 +48,14 @@ feedback_keyboard = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
+cancel_keyboard = ReplyKeyboardMarkup(
+    [["❌ انصراف"]],
+    resize_keyboard=True
+)
 
 # ================== START ==================
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # فعال کردن منوی سنجاق
@@ -139,11 +145,57 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["feedback"] = False
         return
 
-    # ================== منو ==================
-    if text == "⏰ کلید 1":
+    # ================= خوشامدگویی =================
+
+    if context.user_data.get("get_name"):
+
+        if text == "❌ انصراف":
+            context.user_data.clear()
+
+            await update.message.reply_text(
+                "❌ عملیات لغو شد.",
+                reply_markup=reply_markup
+            )
+            return
+
+        context.user_data["employee_name"] = text
+        context.user_data["get_name"] = False
+        context.user_data["get_phone"] = True
+
+        await update.message.reply_text(
+            "📱 شماره موبایل کارمند را وارد کنید:",
+            reply_markup=cancel_keyboard
+        )
+        return
+
+    if context.user_data.get("get_phone"):
+
+        if text == "❌ انصراف":
+            context.user_data.clear()
+
+            await update.message.reply_text(
+                "❌ عملیات لغو شد.",
+                reply_markup=reply_markup
+            )
+            return
+
+        name = context.user_data["employee_name"]
+        phone = text
+
+        context.user_data.clear()
+
+        await update.message.reply_text(
+            f"✅ پیام خوشامدگویی ارسال شد.\n\n"
+            f"👤 نام: {name}\n"
+            f"📱 شماره: {phone}",
+            reply_markup=reply_markup
+        )
+
+        return    # ================== منو ==================
+    if text == "🤝 فرصت های شغلی":
         await update.message.reply_text("کلید 1")
 
-    elif text == "🚕 کلید 2":
+    elif text == "📝 پیام مدیر عامل":
         await update.message.reply_text("کلید 2 🚐")
 
     elif text == "🌐 شبکه های اجتماعی":
@@ -207,6 +259,15 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "📝 لطفا پیشنهاد و یا انتقاد خود را بنویسید",
             reply_markup=feedback_keyboard
+        )
+
+    elif text == "🎉 ارسال پیام خوشامدگویی":
+
+        context.user_data["get_name"] = True
+
+        await update.message.reply_text(
+            "👤 نام کارمند جدید را وارد کنید:",
+            reply_markup=cancel_keyboard
         )
 
     elif text == "🏢 اطلاعات شرکت":
