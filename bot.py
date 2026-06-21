@@ -48,16 +48,6 @@ social_keyboard = ReplyKeyboardMarkup(
 feedback_keyboard = ReplyKeyboardMarkup([["❌ انصراف"]], resize_keyboard=True)
 cancel_keyboard = ReplyKeyboardMarkup([["❌ انصراف"]], resize_keyboard=True)
 
-sms_keyboard = ReplyKeyboardMarkup(
-    [
-        ["🧑‍💼 پیام عدم تأیید مصاحبه"],
-        ["📩 ارسال پیام معمولی"],
-        ["📊 پیام دعوت به مصاحبه"],
-        ["🔙 بازگشت"]
-    ],
-    resize_keyboard=True
-)
-
 confirm_keyboard = ReplyKeyboardMarkup(
     [["✅ ارسال", "❌ لغو"]],
     resize_keyboard=True
@@ -93,47 +83,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             resize_keyboard=True
         )
     )
+
+
 # ================== HANDLE ==================
-
-
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
-    user_id = update.effective_user.id
-
-    # ========== Step: NAME ==========
-    if context.user_data.get("step") == "get_name":
-        context.user_data["name"] = text
-        context.user_data["step"] = "get_phone"
-
-        await update.message.reply_text("📱 شماره تلفن را وارد کنید:")
-        return
-
-    # ========== Step: PHONE + PREVIEW ==========
-    if context.user_data.get("step") == "get_phone":
-
-        name = context.user_data["name"]
-        phone = text
-
-        message = f"""جناب آقای/ سرکار خانم {name}
-
-با سلام
-
-از حضور شما در جلسه مصاحبه شرکت داروسازی ایران هورمون سپاسگزاریم.
-
-در حال حاضر اولویت های مجموعه ما با شرایط شما متفاوت است.
-رزومه شما در بانک اطلاعاتی ما حفظ خواهد شد و در صورت ایجاد فرصت های شغلی متناسب با مهارت های شما با شما تماس خواهیم گرفت.
-
-📱 تماس: {phone}
-"""
-
-        context.user_data["final_message"] = message
-        context.user_data["step"] = "preview"
-
-        await update.message.reply_text(
-            "📌 پیش‌نمایش پیام:\n\n" + message,
-            reply_markup=confirm_keyboard
-        )
-        return
+    user = update.effective_user
+    user_id = user.id
 
     # ========== START MENU ==========
     if text == "🚀 Start / Menu":
@@ -148,6 +104,46 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "🔙 منو فعال شد",
             reply_markup=get_markup(user_id)
+        )
+        return
+
+    # ========== SMS FLOW ==========
+    if context.user_data.get("step") == "get_name":
+        context.user_data["name"] = text
+        context.user_data["step"] = "get_phone"
+
+        await update.message.reply_text("📱 شماره تلفن را وارد کنید:")
+        return
+
+    if context.user_data.get("step") == "get_phone":
+
+        name = context.user_data["name"]
+        phone = text
+
+        tehran = pytz.timezone("Asia/Tehran")
+        now = datetime.now(tehran)
+        now = jdatetime.datetime.fromgregorian(datetime=now)
+
+        message = f"""جناب آقای/ سرکار خانم {name}
+
+با سلام
+
+از حضور شما در جلسه مصاحبه شرکت داروسازی ایران هورمون سپاسگزاریم.
+
+در حال حاضر اولویت های مجموعه ما با شرایط شما متفاوت است.
+رزومه شما در بانک اطلاعاتی ما حفظ خواهد شد.
+
+📱 تماس: {phone}
+📅 {now.strftime('%Y/%m/%d')}
+🕒 {now.strftime('%H:%M:%S')}
+"""
+
+        context.user_data["final_message"] = message
+        context.user_data["step"] = "preview"
+
+        await update.message.reply_text(
+            "📌 پیش‌نمایش پیام:\n\n" + message,
+            reply_markup=confirm_keyboard
         )
         return
 
@@ -170,45 +166,46 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ لغو شد", reply_markup=get_markup(user_id))
         return
 
-    # ========== SMS MENU ==========
-    if text == "📢 ارسال پیامک":
-        await update.message.reply_text(
-            "نوع پیام را انتخاب کنید:",
-            reply_markup=sms_keyboard
-        )
-        return
-
-    if text == "🧑‍💼 پیام عدم تأیید مصاحبه":
-        context.user_data["step"] = "get_name"
-        await update.message.reply_text("👤 نام مصاحبه‌شونده را وارد کنید:")
-        return
-
     # ========== FEEDBACK ==========
-    if text == "✉️ پیشنهادات و انتقادات":
-        context.user_data["feedback"] = True
-        await update.message.reply_text(
-            "📝 متن را بنویسید",
-            reply_markup=feedback_keyboard
-        )
-        return
-
     if context.user_data.get("feedback"):
         if text == "❌ انصراف":
             context.user_data["feedback"] = False
             await update.message.reply_text("❌ لغو شد", reply_markup=get_markup(user_id))
             return
 
-        await context.bot.send_message(
-            chat_id=ADMIN_ID,
-            text=f"📩 پیام جدید:\n\n{text}"
+        tehran = pytz.timezone("Asia/Tehran")
+        now = datetime.now(tehran)
+        now = jdatetime.datetime.fromgregorian(datetime=now)
+
+        username = f"@{user.username}" if user.username else "ندارد"
+
+        message = (
+            "📩 پیام جدید\n\n"
+            f"👤 نام: {user.first_name}\n"
+            f"🔹 یوزرنیم: {username}\n"
+            f"🆔 آیدی: {user.id}\n"
+            f"📅 {now.strftime('%Y/%m/%d')}\n"
+            f"🕒 {now.strftime('%H:%M:%S')}\n\n"
+            f"💬 متن:\n{text}"
         )
 
-        context.user_data["feedback"] = False
+        await context.bot.send_message(chat_id=ADMIN_ID, text=message)
 
         await update.message.reply_text("✅ ارسال شد", reply_markup=get_markup(user_id))
+        context.user_data["feedback"] = False
         return
 
-    # ========== SOCIAL ==========
+    # ========== MENU ==========
+    if text == "📢 ارسال پیامک":
+        context.user_data["step"] = "get_name"
+        await update.message.reply_text("👤 نام را وارد کنید:")
+        return
+
+    if text == "✉️ پیشنهادات و انتقادات":
+        context.user_data["feedback"] = True
+        await update.message.reply_text("📝 متن را بنویسید:", reply_markup=feedback_keyboard)
+        return
+
     if text == "🌐 شبکه های اجتماعی":
         await update.message.reply_text("انتخاب کنید:", reply_markup=social_keyboard)
         return
@@ -222,20 +219,13 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if text == "🔵 لینکدین":
-        await update.message.reply_text(
-            "https://linkedin.com/company/iranhormonepharmaceuticalcompany/"
-        )
+        await update.message.reply_text("https://linkedin.com/company/iranhormonepharmaceuticalcompany/")
         return
 
     if text == "🟢 بله":
         await update.message.reply_text("https://ble.ir/iranhormon")
         return
 
-    if text == "🔙 بازگشت":
-        await update.message.reply_text("برگشت", reply_markup=get_markup(user_id))
-        return
-
-    # ========== CONTACT ==========
     if text == "📞 تماس‌ با ما":
         await update.message.reply_text(
             "📞 شرکت داروسازی ایران هورمون\n\n"
@@ -247,14 +237,12 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # ========== DEFAULT ==========
     await update.message.reply_text("از منو انتخاب کن")
 
 
 # ================== MAIN ==================
 def main():
     app = Application.builder().token(TOKEN).build()
-
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT, handle))
 
