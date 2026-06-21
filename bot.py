@@ -60,6 +60,10 @@ cancel_keyboard = ReplyKeyboardMarkup(
 user_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 admin_markup = ReplyKeyboardMarkup(admin_keyboard, resize_keyboard=True)
 
+
+def get_markup(user_id):
+    return admin_markup if user_id == ADMIN_ID else user_markup
+
 # ================== START ==================
 
 
@@ -120,7 +124,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if text == "❌ انصراف":
             context.user_data["feedback"] = False
-            await update.message.reply_text("❌ لغو شد", reply_markup=user_markup)
+            await update.message.reply_text("❌ لغو شد", reply_markup=get_markup(update._effective_user.id))
             return
 
         user = update.effective_user
@@ -142,7 +146,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await context.bot.send_message(chat_id=ADMIN_ID, text=message)
 
-        await update.message.reply_text("✅ ارسال شد 🙏", reply_markup=user_markup)
+        await update.message.reply_text("✅ ارسال شد 🙏", reply_markup=get_markup(update._effective_user.id))
 
         context.user_data["feedback"] = False
         return
@@ -152,7 +156,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if text == "❌ انصراف":
             context.user_data.clear()
-            await update.message.reply_text("❌ لغو شد", reply_markup=admin_markup)
+            await update.message.reply_text("❌ لغو شد", reply_markup=get_markup(update._effective_user.id))
             return
 
         context.user_data["employee_name"] = text
@@ -169,7 +173,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if text == "❌ انصراف":
             context.user_data.clear()
-            await update.message.reply_text("❌ لغو شد", reply_markup=user_markup)
+            await update.message.reply_text("❌ لغو شد", reply_markup=get_markup(update._effective_user.id))
             return
 
         name = context.user_data["employee_name"]
@@ -179,8 +183,8 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.reply_text(
             f"✅ پیام خوشامدگویی ثبت شد.\n\n👤 {name}\n📱 {phone}",
-            reply_markup=user_markup
-        )
+            reply_markup=get_markup(update._effective_user.id))
+
         return
 
     # ================== منو ==================
@@ -208,7 +212,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("https://ble.ir/iranhormon")
 
     elif text == "🔙 بازگشت":
-        await update.message.reply_text("برگشتی به منو", reply_markup=user_markup)
+        await update.message.reply_text("برگشتی به منو", reply_markup=get_markup(update._effective_user.id))
 
     elif text == "📞 تماس‌ با ما":
         await update.message.reply_text(
