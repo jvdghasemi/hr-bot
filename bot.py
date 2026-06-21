@@ -79,11 +79,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         menu_button=MenuButtonCommands()
     )
 
-    await update.message.reply_text(
+    msg = await update.message.reply_text(
         "👋 سلام\nبه دستیار منابع انسانی ایران هورمون خوش آمدید"
     )
 
     await asyncio.sleep(1)
+    await msg.delete()
 
     await update.message.reply_text(
         "👇 برای ورود به منو روی دکمه زیر بزن",
@@ -92,9 +93,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             resize_keyboard=True
         )
     )
-
-
 # ================== HANDLE ==================
+
+
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     user_id = update.effective_user.id
