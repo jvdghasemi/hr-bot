@@ -71,7 +71,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     msg = await update.message.reply_text(
-        "👋 سلام\nبه دستیار منابع انسانی ایران هورمون خوش آمدی"
+        "👋 سلام\nبه دستیار منابع انسانی ایران هورمون خوش آمدید"
     )
 
     await asyncio.sleep(1)
@@ -160,7 +160,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["get_phone"] = True
 
         await update.message.reply_text(
-            "📱 شماره موبایل را وارد کنید:",
+            "📱 شماره موبایل کارمند جدید را وارد کنید:",
             reply_markup=cancel_keyboard
         )
         return
@@ -212,20 +212,34 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif text == "📞 تماس‌ با ما":
         await update.message.reply_text(
-            "📞 ارتباط با ایران هورمون\n\n"
-            "🌐 https://www.iranhormone.ir\n"
-            "📧 info@iranhormone.com\n"
-            "☎️ 02144905517\n"
-            "📍 تهران، جاده مخصوص کرج\n"
+            "📞 راه های ارتباطی شرکت داروسازی ایران هورمون\n\n"
+
+            "🌐 وب‌سایت:\n"
+            "https://www.iranhormone.ir\n\n"
+
+            "📧 پست الکترونیک:\n"
+            "info@iranhormone.com\n\n"
+
+            "☎️ تلفن:\n"
+            "02144905517\n\n"
+
+            "📍 آدرس:\n\n"
+            "تهران، کیلومتر ۱۱ جاده مخصوص کرج، شرکت داروسازی ایران هورمون\n\n"
+
+            "👇 نمایش مکان در نشان\n"
+            " https://nshn.ir/1a_bvHRNPxjnFM\n\n"
+
+            "📮 کد پستی:\n"
+            "1399813611"
         )
 
     elif text == "✉️ پیشنهادات و انتقادات":
         context.user_data["feedback"] = True
-        await update.message.reply_text("📝 متن خود را بنویسید", reply_markup=feedback_keyboard)
+        await update.message.reply_text("📝 لطفا پیشنهاد و یا انتقاد خود را بنویسید", reply_markup=feedback_keyboard)
 
     elif text == "🎉 ارسال پیام خوشامدگویی":
         context.user_data["get_name"] = True
-        await update.message.reply_text("👤 نام کارمند:", reply_markup=cancel_keyboard)
+        await update.message.reply_text("👤 نام کارمند جدید را وارد کنید:", reply_markup=cancel_keyboard)
 
     elif text == "❓ سوالات پر تکرار":
         await update.message.reply_text("شرکت داروسازی ایران هورمون")
