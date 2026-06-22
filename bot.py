@@ -121,38 +121,35 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "📱 شماره تلفن مصاحبه‌شونده را وارد کنید:"
         )
-
         return
 
-    # مرحله گرفتن شماره + ساخت پیش نمایش
+    # مرحله گرفتن شماره + پیش نمایش
     if context.user_data.get("step") == "get_phone":
-        if text == "بازگشت 🔙":
 
+        if text == "🔙 بازگشت":
             context.user_data.clear()
 
-            await update.message.reply_text("برگشتی به منو 🔙",
-
-
-                                            reply_markup=get_markup(user_id)
-                                            )
+            await update.message.reply_text(
+                "برگشتی به منو 🔙",
+                reply_markup=get_markup(user_id)
+            )
             return
 
         phone = text.strip()
 
         if not (phone.isdigit() and len(phone) == 11):
             await update.message.reply_text(
-                "❌ شماره تلفن نامعتبر است.\n\nلطفاً یک شماره ۱۱ رقمی وارد کنید و یا < بازگشت 🔙 > را بزنید."
+                "❌ شماره تلفن نامعتبر است.\n\nلطفاً یک شماره ۱۱ رقمی وارد کنید."
             )
             return
 
-        name = context.user_data["name"]
+        name = context.user_data.get("name", "")
 
         context.user_data["phone"] = phone
 
         message = f"""{name}
 
 با سلام
-
 از حضور شما در جلسه مصاحبه شرکت داروسازی ایران هورمون سپاسگزاریم.
 
 در حال حاضر اولویت های مجموعه ما با شرایط شما متفاوت است.
@@ -164,16 +161,10 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["step"] = "preview"
 
         await update.message.reply_text(
-
-            "📌 پیش‌نمایش پیام\n\n"
-            + message,
-
+            "📌 پیش‌نمایش پیام\n\n" + message,
             reply_markup=confirm_keyboard
-
         )
-
         return
-
     # تایید ارسال
     if text == "✅ ارسال":
 
