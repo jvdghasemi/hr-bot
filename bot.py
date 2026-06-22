@@ -24,14 +24,14 @@ ADMIN_ID = 7186618503
 keyboard = [
     ["❓ سوالات پر تکرار", "🌐 شبکه های اجتماعی"],
     ["📝 پیام مدیر عامل", "🤝 فرصت های شغلی"],
-    ["✉️ پیشنهادات و انتقادات", "📞 تماس‌ با ما"]
+    ["🎙️ صدای کارکنان", "📞 تماس‌ با ما"]
 ]
 
 admin_keyboard = [
     ["📢 ارسال پیامک"],
     ["❓ سوالات پر تکرار", "🌐 شبکه های اجتماعی"],
     ["📝 پیام مدیر عامل", "🤝 فرصت های شغلی"],
-    ["✉️ پیشنهادات و انتقادات", "📞 تماس‌ با ما"],
+    ["🎙️ صدای کارکنان", "📞 تماس‌ با ما"],
 ]
 
 # ================== کیبوردها ==================
@@ -283,6 +283,54 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    if context.user_data.get("voice_staff"):
+
+        if update.message.text:
+
+            ...
+
+        await context.bot.send_message(
+            ADMIN_ID,
+            message
+        )
+
+        context.user_data["voice_staff"] = False
+
+        return
+    user = update.effective_user
+
+    username = f"@{user.username}" if user.username else "ندارد"
+
+    info = (
+        f"🎤 ویس جدید\n\n"
+        f"👤 نام: {user.first_name}\n"
+        f"🔹 یوزرنیم: {username}\n"
+        f"🆔 آیدی: {user.id}"
+    )
+
+    if context.user_data.get("voice_staff"):
+
+        if update.message.voice:
+
+            ...
+
+        await context.bot.send_message(
+            ADMIN_ID,
+            info
+        )
+
+        await context.bot.send_voice(
+
+            ADMIN_ID,
+
+            update.message.voice.file_id
+
+        )
+
+        context.user_data["voice_staff"] = False
+
+        return
+
     # ================== منو ==================
     if text == "🤝 فرصت های شغلی":
         await update.message.reply_text("کلید 1")
@@ -362,12 +410,20 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=markup
         )
 
-    elif text == "✉️ پیشنهادات و انتقادات":
-        context.user_data["feedback"] = True
+    elif text == "🎤 صدای کارکنان":
+
+        context.user_data["voice_staff"] = True
+
         await update.message.reply_text(
-            "📝 لطفا پیشنهاد و یا انتقاد خود را بنویسید",
+
+            "🎤 نظر خود را ارسال کنید\n\n"
+            "✍ متن یا ویس بفرستید\n\n"
+            "❌ انصراف",
+
             reply_markup=feedback_keyboard
         )
+
+        return
 
     elif text == "🎉 ارسال پیام خوشامدگویی":
         context.user_data["get_name"] = True
