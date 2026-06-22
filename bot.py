@@ -287,12 +287,10 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if update.message.text:
 
-            ...
-
-        await context.bot.send_message(
-            ADMIN_ID,
-            message
-        )
+            await context.bot.send_message(
+                ADMIN_ID,
+                message
+            )
 
         context.user_data["voice_staff"] = False
 
