@@ -126,18 +126,28 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # مرحله گرفتن شماره + ساخت پیش نمایش
     if context.user_data.get("step") == "get_phone":
+        if text == "بازگشت 🔙":
 
-        name = context.user_data["name"]
+            context.user_data.clear()
 
-        context.user_data["phone"] = text
+            await update.message.reply_text("برگشتی به منو 🔙",
+
+
+                                            reply_markup=get_markup(user_id)
+                                            )
+            return
 
         phone = text.strip()
 
         if not (phone.isdigit() and len(phone) == 11):
             await update.message.reply_text(
-                "❌ شماره تلفن نامعتبر است.\n\nلطفاً یک شماره ۱۱ رقمی وارد کنید."
+                "❌ شماره تلفن نامعتبر است.\n\nلطفاً یک شماره ۱۱ رقمی وارد کنید و یا < بازگشت 🔙 > را بزنید."
             )
             return
+
+        name = context.user_data["name"]
+
+        context.user_data["phone"] = phone
 
         message = f"""{name}
 
