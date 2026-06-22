@@ -70,6 +70,7 @@ def get_markup(user_id):
 
 # ================== START ==================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     await context.bot.set_chat_menu_button(
         chat_id=update.effective_chat.id,
         menu_button=MenuButtonCommands()
@@ -93,18 +94,24 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text or ""
     user_id = update.effective_user.id
 
-    # ---------- ورود ----------
+    # ================== ورود ==================
     if text == "🚀 Start / Menu":
         await update.message.reply_text("🔓 وارد منو شدی", reply_markup=get_markup(user_id))
         return
 
-    # ---------- بازگشت ----------
+    # ================== بازگشت ==================
     if text == "🔙 بازگشت":
         context.user_data.clear()
         await update.message.reply_text("🔙 منو", reply_markup=get_markup(user_id))
         return
 
-    # ================== پیام عدم تایید مصاحبه ==================
+    # ================== CANCEL GLOBAL ==================
+    if text == "❌ انصراف":
+        context.user_data.clear()
+        await update.message.reply_text("❌ لغو شد", reply_markup=get_markup(user_id))
+        return
+
+    # ================== عدم تایید مصاحبه ==================
     if context.user_data.get("step") == "get_name":
         context.user_data["name"] = text
         context.user_data["step"] = "get_phone"
@@ -113,11 +120,6 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if context.user_data.get("step") == "get_phone":
-
-        if text == "❌ انصراف":
-            context.user_data.clear()
-            await update.message.reply_text("❌ لغو شد", reply_markup=get_markup(user_id))
-            return
 
         phone = text.strip()
 
@@ -134,15 +136,14 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 رزومه شما در سیستم ذخیره شد.
 """
 
-        context.user_data.clear()
+        # ⚠️ مهم: state قبل از پاک شدن ذخیره میشه
+        context.user_data["final_message"] = message
+        context.user_data["step"] = "preview"
 
         await update.message.reply_text(
             "📌 پیش‌نمایش:\n\n" + message,
             reply_markup=confirm_keyboard
         )
-
-        context.user_data["final_message"] = message
-        context.user_data["step"] = "preview"
         return
 
     if text == "✅ ارسال" and context.user_data.get("step") == "preview":
@@ -155,13 +156,8 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ لغو شد", reply_markup=get_markup(user_id))
         return
 
-    # ================== پیام کارکنان ==================
+    # ================== صدای کارکنان ==================
     if context.user_data.get("voice_staff"):
-
-        if text == "❌ انصراف":
-            context.user_data.clear()
-            await update.message.reply_text("❌ لغو شد", reply_markup=get_markup(user_id))
-            return
 
         info = f"🎙️ پیام کارمند\n👤 {update.effective_user.first_name}"
 
@@ -188,6 +184,10 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("✍ متن یا ویس بفرستید", reply_markup=cancel_keyboard)
         return
 
+    if text == "🌐 شبکه های اجتماعی":
+        await update.message.reply_text("یکی را انتخاب کنید:", reply_markup=social_keyboard)
+        return
+
     if text == "📷 اینستاگرام":
         await update.message.reply_text("https://instagram.com/iranhormone")
         return
@@ -197,7 +197,9 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if text == "🔵 لینکدین":
-        await update.message.reply_text("https://linkedin.com/company/iranhormonepharmaceuticalcompany/")
+        await update.message.reply_text(
+            "https://linkedin.com/company/iranhormonepharmaceuticalcompany/"
+        )
         return
 
     if text == "🟢 بله":
