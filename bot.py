@@ -410,7 +410,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=markup
         )
 
-    elif text == "🎤 صدای کارکنان":
+    elif text == "🎙️ صدای کارکنان":
 
         context.user_data["voice_staff"] = True
 
