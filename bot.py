@@ -60,6 +60,17 @@ sms_keyboard = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
+faq_keyboard = ReplyKeyboardMarkup(
+    [
+        ["📄 قرارداد و استخدام", "📍 حضور و غیاب و تردد", "➕ اضافه کاری"],
+        ["🏖 مرخصی", "🛡 انتظامات", "🍽 غذا و پذیرایی"],
+        ["💻 فناوری اطلاعات", "💰 تسهیلات رفاهی", "🎓 آموزش"],
+        ["🔙 بازگشت"]
+    ],
+    resize_keyboard=True
+)
+
+
 user_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 admin_markup = ReplyKeyboardMarkup(admin_keyboard, resize_keyboard=True)
 
@@ -272,10 +283,48 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     elif text == "❓ سوالات پر تکرار":
-        await update.message.reply_text("شرکت داروسازی ایران هورمون")
+        await update.message.reply_text(
+            "یکی از موارد زیر را انتخاب کنید:",
+            reply_markup=faq_keyboard
+        )
         return
 
-    await update.message.reply_text("از منو انتخاب کن")
+    elif text == "📄 قرارداد و استخدام":
+        await update.message.reply_text("بخش قرارداد و استخدام")
+
+    elif text == "📍 حضور و غیاب و تردد":
+        await update.message.reply_text("بخش حضور و غیاب و تردد")
+
+    elif text == "➕ اضافه کاری":
+        await update.message.reply_text("بخش اضافه کاری")
+
+    elif text == "🏖 مرخصی":
+        await update.message.reply_text("بخش مرخصی")
+
+    elif text == "🛡 انتظامات":
+        await update.message.reply_text("بخش انتظامات")
+
+    elif text == "🍽 غذا و پذیرایی":
+        await update.message.reply_text("بخش غذا و پذیرایی")
+
+    elif text == "💻 فناوری اطلاعات":
+        await update.message.reply_text("بخش فناوری اطلاعات")
+
+    elif text == "💰 تسهیلات رفاهی":
+        await update.message.reply_text("بخش تسهیلات رفاهی")
+
+    elif text == "🎓 آموزش":
+        await update.message.reply_text("بخش آموزش")
+
+    elif text == "🔙 بازگشت":
+        await update.message.reply_text(
+            "برگشت به منو",
+            reply_markup=get_markup(user_id)
+        )
+        return
+
+    else:
+        await update.message.reply_text("از منو انتخاب کن")
 
 
 # ================== MAIN ==================
