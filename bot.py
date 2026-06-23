@@ -1,5 +1,6 @@
 from datetime import datetime
 import pytz
+import random
 import jdatetime
 import asyncio
 import os
@@ -18,8 +19,12 @@ from telegram.ext import (
 )
 
 TOKEN = os.getenv("TOKEN")
-ADMIN_ID = 7186618503
+ADMIN_IDS = [
+    7186618503,
+]
 ADMIN_GROUP_ID = -1004397086878
+
+tickets = {}
 
 # ================== منوها ==================
 keyboard = [
@@ -77,7 +82,11 @@ admin_markup = ReplyKeyboardMarkup(admin_keyboard, resize_keyboard=True)
 
 
 def get_markup(user_id):
-    return admin_markup if user_id == ADMIN_ID else user_markup
+    return admin_markup if user_id == ADMIN_IDS else user_markup
+
+
+def is_admin(user_id):
+    return user_id in ADMIN_IDS
 
 
 # ================== START ==================
@@ -156,58 +165,67 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"💬 متن:\n{text}"
         )
 
-        await context.bot.send_message(chat_id=ADMIN_ID, text=message)
+        await context.bot.send_message(chat_id=ADMIN_IDS, text=message)
 
         await update.message.reply_text("✅ ارسال شد 🙏", reply_markup=get_markup(user_id))
         context.user_data["feedback"] = False
         return
 
-    # ================== VOICE STAFF ==================
+    # ================== VOICE STAFF (TICKET SYSTEM) ==================
     if context.user_data.get("voice_staff"):
-
-        user = update.effective_user
-        username = f"@{user.username}" if user.username else "ندارد"
-
-        info = (
-            f"🎙️ پیام جدید کارکنان\n\n"
-            f"👤 نام: {user.first_name}\n"
-            f"🔹 یوزرنیم: {username}\n"
-            f"🆔 آیدی: {user.id}"
-        )
 
         if text == "❌ انصراف":
             context.user_data["voice_staff"] = False
-            await update.message.reply_text("❌ لغو شد", reply_markup=get_markup(user_id))
-            return
-
-        if update.message.voice:
-            await context.bot.send_message(chat_id=ADMIN_ID, text=info)
-            await context.bot.send_voice(chat_id=ADMIN_ID, voice=update.message.voice.file_id)
-
-            context.user_data["voice_staff"] = False
-            await update.message.reply_text("✅ ویس شما ارسال شد", reply_markup=get_markup(user_id))
-            return
-
-        if update.message.text:
-            await context.bot.send_message(
-                chat_id=ADMIN_ID,
-                text=info + f"\n\n💬 متن:\n{text}"
-            )
-
-            context.user_data["voice_staff"] = False
-            await update.message.reply_text("✅ نظر شما ارسال شد", reply_markup=get_markup(user_id))
-            return
-
-    # ================== SMS MENU ==================
-    if context.user_data.get("sms_menu"):
-
-        if text == "🔙 بازگشت":
-            context.user_data["sms_menu"] = False
-            await update.message.reply_text("برگشت به منو", reply_markup=get_markup(user_id))
-            return
-
+        await update.message.reply_text("❌ لغو شد", reply_markup=get_markup(user_id))
         return
 
+    user = update.effective_user
+    username = f"@{user.username}" if user.username else "ندارد"
+
+    ticket_id = random.randint(1000, 9999)
+
+    tickets[ticket_id] = {
+        "user_id": user.id,
+        "chat_id": update.effective_chat.id
+    }
+
+    info = (
+        f"🎙️ تیکت صدای کارکنان #{ticket_id}\n\n"
+        f"👤 نام: {user.first_name}\n"
+        f"🔹 یوزرنیم: {username}\n"
+        f"🆔 آیدی: {user.id}\n\n"
+    )
+
+    for admin_id in ADMIN_IDS:
+
+        await context.bot.send_message(
+            chat_id=admin_id,
+            text=info
+        )
+
+        if update.message.voice:
+            await context.bot.send_voice(
+                chat_id=admin_id,
+                voice=update.message.voice.file_id
+            )
+        else:
+            await context.bot.send_message(
+                chat_id=admin_id,
+                text=text
+            )
+
+        await context.bot.send_message(
+            chat_id=admin_id,
+            text=f"✍️ پاسخ:\n/reply {ticket_id} متن پاسخ"
+        )
+
+    context.user_data["voice_staff"] = False
+
+    await update.message.reply_text(
+        f"✅ پیام شما ثبت شد\n🎫 شماره تیکت: #{ticket_id}",
+        reply_markup=get_markup(user_id)
+    )
+    return
     # ================== MAIN MENU ==================
     if text == "🤝 فرصت های شغلی":
         await update.message.reply_text("کلید 1")
