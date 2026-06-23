@@ -527,7 +527,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         )
     elif text == "🎓 آموزش":
-        await update.message.reply_text("بخش آموزش")
+        await update.message.reply_text("سوالات و پاسخ های بخش آموزش به زودی اضافه خواهد شد...")
 
     elif text == "🔙 بازگشت":
         await update.message.reply_text(
