@@ -105,6 +105,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ================== HANDLE ==================
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
+    print(update.effective_chat.id)
+    print(update.effective_chat.type)
+
     if not update.message:
         return
 
