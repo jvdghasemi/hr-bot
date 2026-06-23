@@ -19,6 +19,7 @@ from telegram.ext import (
 
 TOKEN = os.getenv("TOKEN")
 ADMIN_ID = 7186618503
+ADMIN_GROUP_ID = -1004397086878
 
 # ================== منوها ==================
 keyboard = [
