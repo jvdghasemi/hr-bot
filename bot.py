@@ -1,4 +1,6 @@
 from datetime import datetime
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import CallbackQueryHandler
 import pytz
 import random
 import jdatetime
@@ -82,11 +84,34 @@ admin_markup = ReplyKeyboardMarkup(admin_keyboard, resize_keyboard=True)
 
 
 def get_markup(user_id):
-    return admin_markup if user_id == ADMIN_IDS else user_markup
+    return admin_markup if user_id in ADMIN_IDS else user_markup
 
 
 def is_admin(user_id):
     return user_id in ADMIN_IDS
+
+
+pending_reply = {}
+
+
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    query = update.callback_query
+    await query.answer()
+
+    user_id = update.effective_user.id
+
+    if user_id not in ADMIN_IDS:
+        return
+
+    if query.data.startswith("reply_"):
+        ticket_id = int(query.data.split("_")[1])
+
+        pending_reply[user_id] = ticket_id
+
+        await query.message.reply_text(
+            f"✍️ حالا جواب تیکت #{ticket_id} رو بنویس"
+        )
 
 
 # ================== START ==================
@@ -112,17 +137,30 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-# ================== HANDLE ==================
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    print(update.effective_chat.id)
-    print(update.effective_chat.type)
 
     if not update.message:
         return
 
-    text = update.message.text or ""
     user_id = update.effective_user.id
+    text = update.message.text or ""
+
+    # ================== ADMIN REPLY SYSTEM ==================
+    if user_id in ADMIN_IDS and user_id in pending_reply:
+        ticket_id = pending_reply[user_id]
+
+        if ticket_id in tickets:
+            user_chat_id = tickets[ticket_id]["chat_id"]
+
+            await context.bot.send_message(
+                chat_id=user_chat_id,
+                text=f"📩 پاسخ مدیریت به تیکت #{ticket_id}\n\n{text}"
+            )
+
+            await update.message.reply_text("✅ ارسال شد")
+
+            del pending_reply[user_id]
+            return
 
     # ---------- ورود ----------
     if text == "🚀 Start / Menu":
@@ -140,92 +178,49 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # ================== FEEDBACK ==================
-    if context.user_data.get("feedback"):
 
+# ticket
+    if context.user_data.get("voice_staff"):
         if text == "❌ انصراف":
-            context.user_data["feedback"] = False
+            context.user_data["voice_staff"] = False
             await update.message.reply_text("❌ لغو شد", reply_markup=get_markup(user_id))
             return
 
         user = update.effective_user
-
-        tehran = pytz.timezone("Asia/Tehran")
-        now = jdatetime.datetime.fromgregorian(datetime=datetime.now(tehran))
-
         username = f"@{user.username}" if user.username else "ندارد"
+        ticket_id = random.randint(100000, 999999)
 
-        message = (
-            f"📩 پیشنهاد/انتقاد جدید\n\n"
+        tickets[ticket_id] = {
+            "user_id": user.id,
+            "chat_id": update.effective_chat.id
+        }
+
+        info = (
+            f"🎙️ تیکت صدای کارکنان #{ticket_id}\n\n"
             f"👤 نام: {user.first_name}\n"
             f"🔹 یوزرنیم: {username}\n"
-            f"🆔 آیدی: {user.id}\n"
-            f"📅 تاریخ: {now.strftime('%Y/%m/%d')}\n"
-            f"🕒 ساعت: {now.strftime('%H:%M:%S')}\n\n"
-            f"💬 متن:\n{text}"
+            f"🆔 آیدی: {user.id}\n\n"
         )
 
-        await context.bot.send_message(chat_id=ADMIN_IDS, text=message)
+        for admin_id in ADMIN_IDS:
+            await context.bot.send_message(chat_id=admin_id, text=info)
 
-        await update.message.reply_text("✅ ارسال شد 🙏", reply_markup=get_markup(user_id))
-        context.user_data["feedback"] = False
+            if update.message.voice:
+                await context.bot.send_voice(
+                    chat_id=admin_id,
+                    voice=update.message.voice.file_id
+                )
+            else:
+                await context.bot.send_message(chat_id=admin_id, text=text)
+
+        await update.message.reply_text(
+            f"✅ ثبت شد\n🎫 #{ticket_id}",
+            reply_markup=get_markup(user_id)
+        )
+
+        context.user_data["voice_staff"] = False
         return
 
-    # ================== VOICE STAFF (TICKET SYSTEM) ==================
-    if context.user_data.get("voice_staff"):
-
-        if text == "❌ انصراف":
-            context.user_data["voice_staff"] = False
-        await update.message.reply_text("❌ لغو شد", reply_markup=get_markup(user_id))
-        return
-
-    user = update.effective_user
-    username = f"@{user.username}" if user.username else "ندارد"
-
-    ticket_id = random.randint(1000, 9999)
-
-    tickets[ticket_id] = {
-        "user_id": user.id,
-        "chat_id": update.effective_chat.id
-    }
-
-    info = (
-        f"🎙️ تیکت صدای کارکنان #{ticket_id}\n\n"
-        f"👤 نام: {user.first_name}\n"
-        f"🔹 یوزرنیم: {username}\n"
-        f"🆔 آیدی: {user.id}\n\n"
-    )
-
-    for admin_id in ADMIN_IDS:
-
-        await context.bot.send_message(
-            chat_id=admin_id,
-            text=info
-        )
-
-        if update.message.voice:
-            await context.bot.send_voice(
-                chat_id=admin_id,
-                voice=update.message.voice.file_id
-            )
-        else:
-            await context.bot.send_message(
-                chat_id=admin_id,
-                text=text
-            )
-
-        await context.bot.send_message(
-            chat_id=admin_id,
-            text=f"✍️ پاسخ:\n/reply {ticket_id} متن پاسخ"
-        )
-
-    context.user_data["voice_staff"] = False
-
-    await update.message.reply_text(
-        f"✅ پیام شما ثبت شد\n🎫 شماره تیکت: #{ticket_id}",
-        reply_markup=get_markup(user_id)
-    )
-    return
     # ================== MAIN MENU ==================
     if text == "🤝 فرصت های شغلی":
         await update.message.reply_text("کلید 1")
@@ -567,6 +562,7 @@ def main():
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT | filters.VOICE, handle))
+    app.add_handler(CallbackQueryHandler(button_handler))
 
     print("BOT RUNNING...")
     app.run_polling()
