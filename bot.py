@@ -98,12 +98,21 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
 
-        pending_reply[user_id] = ticket_id
+    pending_reply[user_id] = ticket_id
 
-        await query.message.reply_text(
-            f"✍️ حالا جواب تیکت #{ticket_id} رو بنویس",
-            reply_markup=feedback_keyboard
+# اگر تیکت صوتی بود، ویس مجدداً برای مدیر ارسال شود
+    if tickets[ticket_id].get("voice_id"):
+
+        await query.message.reply_voice(
+            voice=tickets[ticket_id]["voice_id"],
+            caption=f"🎤 پیام صوتی تیکت #{ticket_id}"
         )
+
+    await query.message.reply_text(
+        f"✍️ حالا جواب تیکت #{ticket_id} رو بنویس",
+        reply_markup=feedback_keyboard
+    )
+
 
 # ================== START ==================
 
@@ -271,6 +280,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "user_id": user.id,
             "chat_id": update.effective_chat.id,
             "text": text if text else "🎤 کاربر پیام صوتی ارسال کرده است.",
+            "voice_id": update.message.voice.file_id if update.message.voice else None,
 
             "name": user.first_name,
             "username": username,
