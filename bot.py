@@ -235,7 +235,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # ---------- ورود ----------
-    if text == "🚀 Start / Menu":
+    if text == "🚀 شروع":
         await update.message.reply_text(
             "✅ وارد منو شدی",
             reply_markup=get_markup(user_id)
