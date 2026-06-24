@@ -1,5 +1,6 @@
 from datetime import datetime
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from database import conn, cursor
 from telegram.ext import CallbackQueryHandler
 import pytz
 import random
@@ -24,9 +25,9 @@ TOKEN = os.getenv("TOKEN")
 ADMIN_IDS = [
     7186618503,
 ]
+
 ADMIN_GROUP_ID = -1004397086878
 
-tickets = {}
 
 # ================== منوها ==================
 keyboard = [
@@ -92,7 +93,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query.data.startswith("reply_"):
         ticket_id = int(query.data.split("_")[1])
 
-        if ticket_id not in tickets:
+        cursor.execute(
+            "SELECT ticket_id FROM tickets WHERE ticket_id=?",
+            (ticket_id,)
+        )
+
+        ticket = cursor.fetchone()
+
+        if ticket is None:
             await query.message.reply_text(
                 "❌ این تیکت قبلاً بسته شده است."
             )
@@ -101,7 +109,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pending_reply[user_id] = ticket_id
 
         await query.message.reply_text(
-
             f"✍️ پاسخ به تیکت #{ticket_id}.",
             reply_markup=feedback_keyboard
         )
@@ -117,11 +124,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         menu_button=MenuButtonCommands()
     )
 
-    await update.message.reply_text(
+    msg = await update.message.reply_text(
         "👋 سلام\nبه دستیار منابع انسانی ایران هورمون خوش آمدید"
     )
 
     await asyncio.sleep(1)
+
+    await msg.delete()
 
     await update.message.reply_text(
         "👇 برای ورود به منو روی دکمه زیر بزن",
@@ -138,7 +147,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     user_id = update.effective_user.id
-    text = update.message.text or ""
+    text = update.message.text
 
     # ================== ADMIN REPLY SYSTEM ==================
     if text in ["❌", "❌ انصراف"] and user_id in pending_reply:
@@ -162,7 +171,15 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         ticket_id = pending_reply[user_id]
 
-        if ticket_id not in tickets:
+        cursor.execute("""
+        SELECT *
+        FROM tickets
+        WHERE ticket_id=?
+        """, (ticket_id,))
+
+        ticket = cursor.fetchone()
+
+        if ticket is None:
             await update.message.reply_text(
                 "❌ تیکت پیدا نشد."
             )
@@ -170,11 +187,17 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             del pending_reply[user_id]
             return
 
-        user_chat_id = tickets[ticket_id]["chat_id"]
-        ticket_text = tickets[ticket_id]["text"]
-        ticket_date = tickets[ticket_id]["date"]
-        ticket_time = tickets[ticket_id]["time"]
-        ticket_name = tickets[ticket_id]["name"]
+        (
+            _,
+            _,
+            user_chat_id,
+            ticket_name,
+            username,
+            ticket_text,
+            voice_id,
+            ticket_date,
+            ticket_time
+        ) = ticket
 
         message = (
 
@@ -199,10 +222,10 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         try:
 
-            if tickets[ticket_id].get("voice_id"):
+            if voice_id:
                 await context.bot.send_voice(
                     chat_id=user_chat_id,
-                    voice=tickets[ticket_id]["voice_id"]
+                    voice=voice_id
                 )
 
             await context.bot.send_message(
@@ -220,14 +243,17 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         await context.bot.send_message(
-            f"✅ تیکت #{ticket_id} پاسخ داده و بسته شد.",
-            chat_id=ADMIN_GROUP_ID
-
-
+            chat_id=ADMIN_GROUP_ID,
+            text=f"✅ تیکت #{ticket_id} پاسخ داده و بسته شد."
         )
 
         del pending_reply[user_id]
-        del tickets[ticket_id]
+        cursor.execute(
+            "DELETE FROM tickets WHERE ticket_id=?",
+            (ticket_id,)
+        )
+
+        conn.commit()
 
         return
 
@@ -257,8 +283,15 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         username = f"@{user.username}" if user.username else "ندارد"
 
         while True:
+
             ticket_id = random.randint(100000, 999999)
-            if ticket_id not in tickets:
+
+            cursor.execute(
+                "SELECT 1 FROM tickets WHERE ticket_id=?",
+                (ticket_id,)
+            )
+
+            if cursor.fetchone() is None:
                 break
 
         tehran = pytz.timezone("Asia/Tehran")
@@ -271,18 +304,42 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         shamsi_time = now.strftime("%H:%M")
 
-        tickets[ticket_id] = {
-            "user_id": user.id,
-            "chat_id": update.effective_chat.id,
-            "text": text if text else "☝️ پیام صوتی ارسال کردید که بالای همین پیام است.",
-            "voice_id": update.message.voice.file_id if update.message.voice else None,
+        voice_id = update.message.voice.file_id if update.message.voice else None
+        ticket_text = text if text else "☝️ پیام صوتی ارسال کردید که بالای همین پیام است."
 
-            "name": user.first_name,
-            "username": username,
+        cursor.execute("""
+        INSERT INTO tickets
+        (
+            ticket_id,
+            user_id,
+            chat_id,
+            name,
+            username,
+            text,
+            voice_id,
+            date,
+            time
+        )
+                       
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
 
-            "date": shamsi_date,
-            "time": shamsi_time
-        }
+            ticket_id,
+            user.id,
+            update.effective_chat.id,
+
+            user.first_name,
+            username,
+
+            ticket_text,
+            voice_id,
+
+            shamsi_date,
+            shamsi_time
+
+        ))
+
+        conn.commit()
 
         keyboard = InlineKeyboardMarkup(
             [
@@ -312,7 +369,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
                 chat_id=ADMIN_GROUP_ID,
 
-                text=info + f"\n💬 پیام:\n{text}",
+                text=info + f"\n💬 پیام:\n{ticket_text}",
 
                 reply_markup=keyboard
 

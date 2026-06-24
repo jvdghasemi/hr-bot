@@ -1,24 +1,21 @@
 import sqlite3
 
-conn = sqlite3.connect("faq.db")
+conn = sqlite3.connect("tickets.db")
+cursor = conn.cursor()
 
-c = conn.cursor()
-
-c.execute("""
-
-CREATE TABLE IF NOT EXISTS faq(
-
-id INTEGER PRIMARY KEY,
-
-question TEXT,
-
-answer TEXT
-
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS tickets (
+    ticket_id INTEGER PRIMARY KEY,
+    user_id INTEGER,
+    chat_id INTEGER,
+    name TEXT,
+    username TEXT,
+    text TEXT,
+    voice_id TEXT,
+    date TEXT,
+    time TEXT
 )
-
 """)
 
-
 conn.commit()
-
 conn.close()
