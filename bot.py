@@ -220,7 +220,8 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         await update.message.reply_text(
-            "✅ تیکت #{ticket_id} پاسخ داده و بسته شد.",
+
+            f"✅ تیکت #{ticket_id} پاسخ داده و بسته شد.",
             reply_markup=get_markup(user_id)
         )
 
