@@ -36,7 +36,6 @@ keyboard = [
 ]
 
 admin_keyboard = [
-    ["📢 ارسال پیامک"],
     ["❓ سوالات پر تکرار", "🌐 شبکه های اجتماعی"],
     ["📝 پیام مدیر عامل", "🤝 فرصت های شغلی"],
     ["🎙️ صدای کارکنان", "📞 تماس‌ با ما"],
@@ -55,16 +54,6 @@ social_keyboard = ReplyKeyboardMarkup(
 
 feedback_keyboard = ReplyKeyboardMarkup(
     [["❌ انصراف"]],
-    resize_keyboard=True
-)
-
-sms_keyboard = ReplyKeyboardMarkup(
-    [
-        ["📩 ارسال پیام معمولی"],
-        ["🧑‍💼 پیام عدم تأیید مصاحبه"],
-        ["📊 پیام دعوت به مصاحبه"],
-        ["🔙 بازگشت"]
-    ],
     resize_keyboard=True
 )
 
@@ -160,6 +149,8 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("✅ ارسال شد")
 
             del pending_reply[user_id]
+            del tickets[ticket_id]
+
             return
 
     # ---------- ورود ----------
@@ -188,12 +179,27 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         user = update.effective_user
         username = f"@{user.username}" if user.username else "ندارد"
-        ticket_id = random.randint(100000, 999999)
+
+        while True:
+            ticket_id = random.randint(100000, 999999)
+            if ticket_id not in tickets:
+                break
 
         tickets[ticket_id] = {
             "user_id": user.id,
             "chat_id": update.effective_chat.id
         }
+
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton(
+                        "📩 پاسخ به این تیکت",
+                        callback_data=f"reply_{ticket_id}"
+                    )
+                ]
+            ]
+        )
 
         info = (
             f"🎙️ تیکت صدای کارکنان #{ticket_id}\n\n"
@@ -202,16 +208,31 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🆔 آیدی: {user.id}\n\n"
         )
 
-        for admin_id in ADMIN_IDS:
-            await context.bot.send_message(chat_id=admin_id, text=info)
+        if text:
 
-            if update.message.voice:
-                await context.bot.send_voice(
-                    chat_id=admin_id,
-                    voice=update.message.voice.file_id
-                )
-            else:
-                await context.bot.send_message(chat_id=admin_id, text=text)
+            await context.bot.send_message(
+
+                chat_id=ADMIN_GROUP_ID,
+
+                text=info + f"\n💬 پیام:\n{text}",
+
+                reply_markup=keyboard
+
+            )
+
+        elif update.message.voice:
+
+            await context.bot.send_voice(
+
+                chat_id=ADMIN_GROUP_ID,
+
+                voice=update.message.voice.file_id,
+
+                caption=info,
+
+                reply_markup=keyboard
+
+            )
 
         await update.message.reply_text(
             f"✅ ثبت شد\n🎫 #{ticket_id}",
@@ -302,14 +323,6 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             "📮 کد پستی:\n"
             "1399813611"
-        )
-        return
-
-    elif text == "📢 ارسال پیامک":
-        context.user_data["sms_menu"] = True
-        await update.message.reply_text(
-            "نوع پیام را انتخاب کنید:",
-            reply_markup=sms_keyboard
         )
         return
 
