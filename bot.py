@@ -242,14 +242,6 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # ---------- بازگشت ----------
-    if text == "🏠 منو / Start":
-        await update.message.reply_text(
-            "🔙 منو فعال شد",
-            reply_markup=get_markup(user_id)
-        )
-        return
-
 
 # ticket
     if context.user_data.get("voice_staff"):
