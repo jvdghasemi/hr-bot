@@ -26,7 +26,7 @@ ADMIN_IDS = [
     7186618503,
 ]
 
-ADMIN_GROUP_ID = -1004397086878
+ADMIN_GROUP_ID = -1004433309113
 
 
 # ================== منوها ==================
@@ -723,11 +723,14 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    else:
-        await update.message.reply_text("از منو انتخاب کن")
+    if update.effective_chat.type != "private":
+        return
 
+    await update.message.reply_text("از منو انتخاب کن")
 
 # ================== MAIN ==================
+
+
 def main():
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
