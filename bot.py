@@ -328,7 +328,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
         await update.message.reply_text(
-            f"✅ ثبت شد\n🎫 #{ticket_id}",
+            f"تیکت شما با کد زیر ثبت شد ✅\n🎫 #{ticket_id}",
             reply_markup=get_markup(user_id)
         )
 
