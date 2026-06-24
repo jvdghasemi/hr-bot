@@ -224,8 +224,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         await context.bot.send_message(
-            chat_id=ADMIN_GROUP_ID,
-            text=f"✅ تیکت #{ticket_id} پاسخ داده شد و بسته شد."
+            chat_id=ADMIN_GROUP_ID
         )
 
         del pending_reply[user_id]
@@ -236,7 +235,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ---------- ورود ----------
     if text == "🚀 Start / Menu":
         await update.message.reply_text(
-            "🔓 وارد منو شدی",
+            "✅ وارد منو شدی",
             reply_markup=get_markup(user_id)
         )
         return
