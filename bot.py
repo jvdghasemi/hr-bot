@@ -100,14 +100,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     pending_reply[user_id] = ticket_id
 
-# اگر تیکت صوتی بود، ویس مجدداً برای مدیر ارسال شود
-    if tickets[ticket_id].get("voice_id"):
-
-        await query.message.reply_voice(
-            voice=tickets[ticket_id]["voice_id"],
-            caption=f"🎤 پیام صوتی تیکت #{ticket_id}"
-        )
-
     await query.message.reply_text(
         f"✍️ حالا جواب تیکت #{ticket_id} رو بنویس",
         reply_markup=feedback_keyboard
@@ -205,6 +197,13 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         try:
+
+            if tickets[ticket_id].get("voice_id"):
+                await context.bot.send_voice(
+                    chat_id=user_chat_id,
+                    voice=tickets[ticket_id]["voice_id"]
+                )
+
             await context.bot.send_message(
                 chat_id=user_chat_id,
                 text=message
