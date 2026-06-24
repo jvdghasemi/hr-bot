@@ -98,13 +98,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
 
-    pending_reply[user_id] = ticket_id
+        pending_reply[user_id] = ticket_id
 
-    await query.message.reply_text(
+        await query.message.reply_text(
 
-        f"✍️ پاسخ به تیکت #{ticket_id}.",
-        reply_markup=feedback_keyboard
-    )
+            f"✍️ پاسخ به تیکت #{ticket_id}.",
+            reply_markup=feedback_keyboard
+        )
 
 
 # ================== START ==================
@@ -219,14 +219,11 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             del pending_reply[user_id]
             return
 
-        await update.message.reply_text(
-
-            f"✅ تیکت #{ticket_id} پاسخ داده و بسته شد.",
-            reply_markup=get_markup(user_id)
-        )
-
         await context.bot.send_message(
+            f"✅ تیکت #{ticket_id} پاسخ داده و بسته شد.",
             chat_id=ADMIN_GROUP_ID
+
+
         )
 
         del pending_reply[user_id]
@@ -248,6 +245,12 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if text == "❌ انصراف":
             context.user_data["voice_staff"] = False
             await update.message.reply_text("❌ لغو شد", reply_markup=get_markup(user_id))
+            return
+
+        if not update.message.text and not update.message.voice:
+            await update.message.reply_text(
+                "❌ فقط متن یا پیام صوتی ارسال کنید."
+            )
             return
 
         user = update.effective_user
