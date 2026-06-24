@@ -278,7 +278,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         tickets[ticket_id] = {
             "user_id": user.id,
             "chat_id": update.effective_chat.id,
-            "text": text if text else "🎤 کاربر پیام صوتی ارسال کرده است.",
+            "text": text if text else "☝️ پیام صوتی ارسال کردید که بالای همین پیام است.",
             "voice_id": update.message.voice.file_id if update.message.voice else None,
 
             "name": user.first_name,
