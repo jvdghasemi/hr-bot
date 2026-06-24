@@ -76,10 +76,6 @@ def get_markup(user_id):
     return admin_markup if user_id in ADMIN_IDS else user_markup
 
 
-def is_admin(user_id):
-    return user_id in ADMIN_IDS
-
-
 pending_reply = {}
 
 
@@ -96,14 +92,22 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query.data.startswith("reply_"):
         ticket_id = int(query.data.split("_")[1])
 
+        if ticket_id not in tickets:
+            await query.message.reply_text(
+                "❌ این تیکت قبلاً بسته شده است."
+            )
+            return
+
         pending_reply[user_id] = ticket_id
 
         await query.message.reply_text(
-            f"✍️ حالا جواب تیکت #{ticket_id} رو بنویس"
+            f"✍️ حالا جواب تیکت #{ticket_id} رو بنویس",
+            reply_markup=feedback_keyboard
         )
 
-
 # ================== START ==================
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.set_chat_menu_button(
@@ -135,23 +139,93 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text or ""
 
     # ================== ADMIN REPLY SYSTEM ==================
+    if text in ["❌", "❌ انصراف"] and user_id in pending_reply:
+
+        del pending_reply[user_id]
+
+        await update.message.reply_text(
+            "❌ پاسخ به تیکت لغو شد.",
+            reply_markup=get_markup(user_id)
+        )
+
+        return
+
     if user_id in ADMIN_IDS and user_id in pending_reply:
+
+        if update.message.voice:
+            await update.message.reply_text(
+                "❌ پاسخ تیکت فقط باید به صورت متنی ارسال شود."
+            )
+            return
+
         ticket_id = pending_reply[user_id]
 
-        if ticket_id in tickets:
-            user_chat_id = tickets[ticket_id]["chat_id"]
-
-            await context.bot.send_message(
-                chat_id=user_chat_id,
-                text=f"📩 پاسخ مدیریت به تیکت #{ticket_id}\n\n{text}"
+        if ticket_id not in tickets:
+            await update.message.reply_text(
+                "❌ تیکت پیدا نشد."
             )
 
-            await update.message.reply_text("✅ ارسال شد")
-
             del pending_reply[user_id]
-            del tickets[ticket_id]
-
             return
+
+        user_chat_id = tickets[ticket_id]["chat_id"]
+        ticket_text = tickets[ticket_id]["text"]
+        ticket_date = tickets[ticket_id]["date"]
+        ticket_time = tickets[ticket_id]["time"]
+        ticket_name = tickets[ticket_id]["name"]
+
+        message = (
+
+            f"👤 {ticket_name}\n"
+            f"📅 {ticket_date}\n"
+            f"🕒 {ticket_time}\n\n"
+
+            f"📩 پاسخ به تیکت #{ticket_id}\n\n"
+
+            f"📝 نظر شما:\n"
+            f"{ticket_text}\n\n"
+
+            f"━━━━━━━━━━━━━━\n\n"
+
+            f"با سلام\n\n"
+
+            f"پاسخ مدیریت در خصوص نظر شما:\n\n"
+            f"{text}\n\n"
+
+            f"━━━━━━━━━━━━━━\n"
+            f"واحد مدیریت منابع انسانی\n"
+            f"شرکت داروسازی ایران هورمون"
+        )
+
+        try:
+            await context.bot.send_message(
+                chat_id=user_chat_id,
+                text=message
+            )
+
+        except Exception as e:
+            print(f"Send Error: {e}")
+
+            await update.message.reply_text(
+                "❌ ارسال پیام به کاربر ناموفق بود."
+            )
+            del pending_reply[user_id]
+            return
+
+        await update.message.reply_text(
+            "✅ پاسخ ارسال شد.",
+            reply_markup=get_markup(user_id)
+        )
+
+        await context.bot.send_message(
+            chat_id=ADMIN_GROUP_ID,
+            text=f"✅ تیکت #{ticket_id} پاسخ داده شد و بسته شد."
+        )
+
+        del pending_reply[user_id]
+        del tickets[ticket_id]
+
+        return
 
     # ---------- ورود ----------
     if text == "🚀 Start / Menu":
@@ -185,9 +259,26 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if ticket_id not in tickets:
                 break
 
+        tehran = pytz.timezone("Asia/Tehran")
+
+        now = datetime.now(tehran)
+
+        shamsi_date = jdatetime.datetime.fromgregorian(
+            datetime=now
+        ).strftime("%Y/%m/%d")
+
+        shamsi_time = now.strftime("%H:%M")
+
         tickets[ticket_id] = {
             "user_id": user.id,
-            "chat_id": update.effective_chat.id
+            "chat_id": update.effective_chat.id,
+            "text": text if text else "🎤 کاربر پیام صوتی ارسال کرده است.",
+
+            "name": user.first_name,
+            "username": username,
+
+            "date": shamsi_date,
+            "time": shamsi_time
         }
 
         keyboard = InlineKeyboardMarkup(
@@ -203,12 +294,16 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         info = (
             f"🎙️ تیکت صدای کارکنان #{ticket_id}\n\n"
+
             f"👤 نام: {user.first_name}\n"
             f"🔹 یوزرنیم: {username}\n"
             f"🆔 آیدی: {user.id}\n\n"
+
+            f"📅 تاریخ: {shamsi_date}\n"
+            f"🕒 ساعت: {shamsi_time}"
         )
 
-        if text:
+        if update.message.text:
 
             await context.bot.send_message(
 
@@ -228,7 +323,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
                 voice=update.message.voice.file_id,
 
-                caption=info,
+                caption=info + "\n\n🎤 پیام صوتی",
 
                 reply_markup=keyboard
 
@@ -328,10 +423,12 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif text == "🎙️ صدای کارکنان":
         context.user_data["voice_staff"] = True
+
         await update.message.reply_text(
-            "🎤 نظر خود را ارسال کنید\n\n❌ انصراف",
+            "🎤 نظر خود را ارسال کنید.\nبرای لغو روی «❌ انصراف» بزنید.",
             reply_markup=feedback_keyboard
         )
+
         return
 
     elif text == "❓ سوالات پر تکرار":
@@ -574,7 +671,12 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT | filters.VOICE, handle))
+    app.add_handler(
+        MessageHandler(
+            (filters.TEXT | filters.VOICE) & ~filters.COMMAND,
+            handle
+        )
+    )
     app.add_handler(CallbackQueryHandler(button_handler))
 
     print("BOT RUNNING...")
