@@ -126,7 +126,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "👇 برای ورود به منو روی دکمه زیر بزن",
         reply_markup=ReplyKeyboardMarkup(
-            [["🚀 Start / Menu"]],
+            [["🚀 شروع"]],
             resize_keyboard=True
         )
     )
