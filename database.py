@@ -18,4 +18,3 @@ CREATE TABLE IF NOT EXISTS tickets (
 """)
 
 conn.commit()
-conn.close()
