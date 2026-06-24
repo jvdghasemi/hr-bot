@@ -178,22 +178,20 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             f"👤 {ticket_name}\n"
             f"📅 {ticket_date}\n"
-            f"🕒 {ticket_time}\n\n"
+            f"🕒 {ticket_time}\n"
 
             f"📩 پاسخ به تیکت #{ticket_id}\n\n"
 
-            f"📝 نظر شما:\n"
+            f"📝 نظر شما:\n\n"
             f"{ticket_text}\n\n"
 
             f"━━━━━━━━━━━━━━\n\n"
 
             f"با سلام\n\n"
-
-            f"پاسخ مدیریت در خصوص نظر شما:\n\n"
             f"{text}\n\n"
 
             f"━━━━━━━━━━━━━━\n"
-            f"واحد مدیریت منابع انسانی\n"
+            f"امور اداری و منابع انسانی\n\n"
             f"شرکت داروسازی ایران هورمون"
         )
 
