@@ -676,7 +676,7 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(
         MessageHandler(
-            (filters.TEXT | filters.VOICE) & ~filters.COMMAND,
+            filters.ALL & ~filters.COMMAND,
             handle
         )
     )
