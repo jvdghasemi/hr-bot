@@ -101,7 +101,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pending_reply[user_id] = ticket_id
 
     await query.message.reply_text(
-        f"✍️ پاسخ به تیکت شماره #{ticket_id} ",
+        f"✍️ پاسخ به تیکت شماره",  # {ticket_id}
         reply_markup=feedback_keyboard
     )
 
