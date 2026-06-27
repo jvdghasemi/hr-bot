@@ -228,100 +228,42 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         data = await health_check()
 
-    message = f"""
+        message = f"""
+    🤖 Health Monitor V2
 
-🤖 Health Monitor V2
+    🟢 Telegram
+    {data['telegram']}
 
+    🎫 Tickets
+    {data['tickets']}
 
+    📨 Pending
+    {data['pending']}
 
-🟢 Telegram
+    🗄 DB
+    {data['dbsize']} KB
 
+    🧠 RAM
+    {data['ram']}%
 
-{data['telegram']}
+    ⚙ CPU
+    {data['cpu']}%
 
+    ⏳ Uptime
+    {data['uptime']}
 
+    📶 Polling
+    {data['polling']}
 
-🟢 SQLite
+    🚀 Version
+    {data['version']}
 
+    ❌ Last Error
+    {data['error']}
+    """
 
-OK
-
-
-
-
-🎫 Tickets
-
-
-{data['tickets']}
-
-
-
-
-📨 Pending
-
-
-{data['pending']}
-
-
-
-
-🗄 Database
-
-
-{data['dbsize']} KB
-
-
-
-
-🧠 RAM
-
-
-{data['ram']}%
-
-
-
-
-
-⚙ CPU
-
-
-{data['cpu']}%
-
-
-
-
-⏳ Uptime
-
-
-{data['uptime']}
-
-
-
-
-📶 Polling
-
-
-{data['polling']}
-
-
-
-
-🚀 Version
-
-
-{data['version']}
-
-
-
-
-❌ Last Error
-
-
-{data['error']}
-
-
-
-"""
+        await update.message.reply_text(message)
+        return
 
     # ================== ADMIN REPLY SYSTEM ==================
     if text in ["❌", "❌ انصراف"] and user_id in pending_reply:
