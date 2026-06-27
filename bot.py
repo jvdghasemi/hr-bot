@@ -1,5 +1,6 @@
 from time import time
 from datetime import datetime
+from rapidfuzz import fuzz
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from database import conn, cursor
 from telegram.ext import CallbackQueryHandler
@@ -98,6 +99,109 @@ def get_markup(user_id):
 
 
 pending_reply = {}
+
+SMART_FAQ = {
+
+
+    "سرویس": [
+
+        "سرویس داریم",
+
+        "سرویس هست",
+
+        "ایاب ذهاب",
+
+        "اتوبوس",
+
+        "سرویس شرکت",
+
+        "سرویس شرکت هست"
+
+    ],
+
+
+
+    "وام": [
+
+
+        "وام",
+
+        "وام میدن",
+
+        "صندوق تعاون",
+
+        "کارگشایی",
+
+        "تسهیلات"
+
+    ],
+
+
+
+
+    "پارکینگ": [
+
+
+        "پارکینگ",
+
+        "جای پارک",
+
+        "پارک خودرو"
+
+    ],
+
+
+
+
+    "مرخصی": [
+
+
+        "مرخصی",
+
+        "مرخصی ساعتی",
+
+        "استحقاقی",
+
+        "چند ساعت مرخصی"
+
+    ]
+
+}
+
+
+def smart_search(text):
+
+    text = text.lower()
+
+    best_score = 0
+    best_key = None
+
+    for key, items in SMART_FAQ.items():
+
+        for item in items:
+
+            score = fuzz.ratio(
+
+
+                text,
+
+
+                item.lower()
+
+
+            )
+
+            if score > best_score:
+
+                best_score = score
+
+                best_key = key
+
+    if best_score >= 70:
+
+        return best_key
+
+    return None
 
 
 async def health_check():
@@ -224,9 +328,27 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text
 
-    if text == "🔧 سلامت ربات":
+    faq = smart_search(text)
 
-        data = await health_check()
+    if faq == "سرویس":
+
+        text = "🛡 انتظامات"
+
+    elif faq == "وام":
+
+        text = "💰 تسهیلات رفاهی"
+
+    elif faq == "پارکینگ":
+
+        text = "🛡 انتظامات"
+
+    elif faq == "مرخصی":
+
+        text = "🏖 مرخصی"
+
+        if text == "🔧 سلامت ربات":
+
+            data = await health_check()
 
         message = f"""
     🤖 Health Monitor V2
@@ -845,7 +967,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             "❌ سوال شما در پایگاه دانش یافت نشد.\n\n"
 
-            "لطفااز منو انتخاب کنید یا سوال خود را واضح‌تر بنویسید."
+            "لطفا از منو انتخاب کنید یا سوال خود را واضح‌ تر بنویسید."
 
         )
 
