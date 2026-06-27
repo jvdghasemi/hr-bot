@@ -921,7 +921,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.reply_text(
 
-            "❌ سوال شما در پایگاه دانش یافت نشد.\n\n"
+            "❌ سوال شما در پایگاه داده یافت نشد.\n\n"
 
             "لطفا از منو انتخاب کنید یا سوال خود را واضح‌ تر بنویسید."
 
