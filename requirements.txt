@@ -2,3 +2,4 @@ python-telegram-bot==22.1
 pytz
 jdatetime
 psutil
+rapidfuzz==3.6.1
