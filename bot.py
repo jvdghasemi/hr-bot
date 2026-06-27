@@ -100,106 +100,57 @@ def get_markup(user_id):
 
 pending_reply = {}
 
-SMART_FAQ = {
 
-
-    "سرویس": [
-
-        "سرویس داریم",
-
-        "سرویس هست",
-
-        "ایاب ذهاب",
-
-        "اتوبوس",
-
-        "سرویس شرکت",
-
-        "سرویس شرکت هست"
-
-    ],
-
-
-
-    "وام": [
-
-
-        "وام",
-
-        "وام میدن",
-
-        "صندوق تعاون",
-
-        "کارگشایی",
-
-        "تسهیلات"
-
-    ],
-
-
-
-
-    "پارکینگ": [
-
-
-        "پارکینگ",
-
-        "جای پارک",
-
-        "پارک خودرو"
-
-    ],
-
-
-
-
-    "مرخصی": [
-
-
-        "مرخصی",
-
-        "مرخصی ساعتی",
-
-        "استحقاقی",
-
-        "چند ساعت مرخصی"
-
-    ]
-
-}
-
-
-def smart_search(text):
-
+def ai_faq(text):
     text = text.lower()
 
+    intents = [
+        {
+            "key": "سرویس",
+            "keywords": [
+                "سرویس", "ایاب ذهاب", "رفت و آمد", "اتوبوس", "شرکت سرویس", "چطور میریم شرکت"
+            ],
+            "answer": "🛡 انتظامات"
+        },
+
+        {
+            "key": "وام",
+            "keywords": [
+                "وام", "وام میدن", "تسهیلات", "صندوق", "کارگشایی", "پول قرض"
+            ],
+            "answer": "💰 تسهیلات رفاهی"
+        },
+
+        {
+            "key": "پارکینگ",
+            "keywords": [
+                "پارکینگ", "جای پارک", "ماشین کجا بذارم", "پارک خودرو"
+            ],
+            "answer": "🛡 انتظامات"
+        },
+
+        {
+            "key": "مرخصی",
+            "keywords": [
+                "مرخصی", "استراحت", "چند روز مرخصی", "مرخصی ساعتی", "غیبت"
+            ],
+            "answer": "🏖 مرخصی"
+        }
+    ]
+
     best_score = 0
-    best_key = None
+    best_answer = None
 
-    for key, items in SMART_FAQ.items():
-
-        for item in items:
-
-            score = fuzz.ratio(
-
-
-                text,
-
-
-                item.lower()
-
-
-            )
+    for intent in intents:
+        for kw in intent["keywords"]:
+            score = fuzz.partial_ratio(text, kw.lower())
 
             if score > best_score:
-
                 best_score = score
-
-                best_key = key
+                best_answer = intent["answer"]
 
     if best_score >= 70:
-
-        return best_key
+        return best_answer
 
     return None
 
@@ -322,33 +273,21 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
+    if faq_answer:
+        await update.message.reply_text(faq_answer)
+        return
+
     if not update.message:
         return
 
     user_id = update.effective_user.id
     text = update.message.text
 
-    faq = smart_search(text)
+    faq_answer = ai_faq(text)
 
-    if faq == "سرویس":
+    if text == "🔧 سلامت ربات":
 
-        text = "🛡 انتظامات"
-
-    elif faq == "وام":
-
-        text = "💰 تسهیلات رفاهی"
-
-    elif faq == "پارکینگ":
-
-        text = "🛡 انتظامات"
-
-    elif faq == "مرخصی":
-
-        text = "🏖 مرخصی"
-
-        if text == "🔧 سلامت ربات":
-
-            data = await health_check()
+        data = await health_check()
 
         message = f"""
     🤖 Health Monitor V2
