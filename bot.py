@@ -1,3 +1,4 @@
+from time import time
 from datetime import datetime
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from database import conn, cursor
@@ -7,6 +8,10 @@ import random
 import jdatetime
 import asyncio
 import os
+import logging
+import traceback
+import sqlite3
+import psutil
 
 from telegram import (
     Update,
@@ -21,12 +26,26 @@ from telegram.ext import (
     ContextTypes
 )
 
+logging.basicConfig(
+
+    level=logging.INFO,
+
+    format='%(asctime)s - %(message)s'
+
+)
+
 TOKEN = os.getenv("TOKEN")
 ADMIN_IDS = [
-    7186618503,
+    7186618503, 8040436465,
 ]
 
 ADMIN_GROUP_ID = -1004433309113
+
+BOT_START_TIME = time()
+
+BOT_VERSION = "2.0.0"
+
+LAST_ERROR = "None"
 
 
 # ================== منوها ==================
@@ -40,6 +59,7 @@ admin_keyboard = [
     ["❓ سوالات پر تکرار", "🌐 شبکه های اجتماعی"],
     ["📝 پیام مدیر عامل", "🤝 فرصت های شغلی"],
     ["🎙️ صدای کارکنان", "📞 تماس‌ با ما"],
+    ["🔧 سلامت ربات"],
 ]
 
 social_keyboard = ReplyKeyboardMarkup(
@@ -78,6 +98,130 @@ def get_markup(user_id):
 
 
 pending_reply = {}
+
+
+async def health_check():
+
+    global LAST_ERROR
+
+    data = {}
+
+    try:
+
+        ram = psutil.virtual_memory()
+
+        cpu = psutil.cpu_percent()
+
+        data["ram"] = ram.percent
+        data["cpu"] = cpu
+
+    except Exception as e:
+
+        LAST_ERROR = str(e)
+
+        data["ram"] = "Unknown"
+        data["cpu"] = "Unknown"
+
+    uptime = int(
+
+        time() - BOT_START_TIME
+
+    )
+
+    days = uptime // 86400
+
+    hours = (uptime % 86400) // 3600
+
+    minutes = (uptime % 3600) // 60
+
+    data["uptime"] = (
+
+        f"{days}d "
+
+        f"{hours}h "
+
+        f"{minutes}m"
+
+    )
+
+    data["version"] = BOT_VERSION
+
+    data["error"] = LAST_ERROR
+
+
+data = {}
+
+
+# ================= SQLITE =================
+
+
+try:
+
+    cursor.execute(
+
+        "SELECT COUNT(*) FROM tickets"
+
+    )
+
+    total_tickets = cursor.fetchone()[0]
+
+
+except:
+
+    total_tickets = 0
+
+
+data["tickets"] = total_tickets
+
+
+# ================= Pending =================
+
+
+data["pending"] = len(
+
+    pending_reply
+
+)
+
+
+# ================= DB SIZE =================
+
+
+try:
+
+    size = os.path.getsize(
+
+        "tickets.db"
+
+    )
+
+    size = round(
+
+        size / 1024,
+
+        2
+
+    )
+
+
+except:
+
+    size = 0
+
+
+data["dbsize"] = size
+
+
+# ================= Telegram =================
+
+
+data["telegram"] = "🟢 OK"
+
+
+# ================= Polling =================
+
+
+data["polling"] = "🟢 Running"
 
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -148,6 +292,105 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_user.id
     text = update.message.text
+
+    if text == "🔧 سلامت ربات":
+
+        data = await health_check()
+
+    message = f"""
+
+🤖 Health Monitor V2
+
+
+
+🟢 Telegram
+
+
+{data['telegram']}
+
+
+
+🟢 SQLite
+
+
+OK
+
+
+
+
+🎫 Tickets
+
+
+{data['tickets']}
+
+
+
+
+📨 Pending
+
+
+{data['pending']}
+
+
+
+
+🗄 Database
+
+
+{data['dbsize']} KB
+
+
+
+
+🧠 RAM
+
+
+{data['ram']}%
+
+
+
+
+
+⚙ CPU
+
+
+{data['cpu']}%
+
+
+
+
+⏳ Uptime
+
+
+{data['uptime']}
+
+
+
+
+📶 Polling
+
+
+{data['polling']}
+
+
+
+
+🚀 Version
+
+
+{data['version']}
+
+
+
+
+❌ Last Error
+
+
+{data['error']}
+
+
+
+"""
 
     # ================== ADMIN REPLY SYSTEM ==================
     if text in ["❌", "❌ انصراف"] and user_id in pending_reply:
