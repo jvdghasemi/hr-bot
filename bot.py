@@ -101,127 +101,58 @@ pending_reply = {}
 
 
 async def health_check():
-
     global LAST_ERROR
 
     data = {}
 
+    # ================= RAM / CPU =================
     try:
-
         ram = psutil.virtual_memory()
-
         cpu = psutil.cpu_percent()
 
         data["ram"] = ram.percent
         data["cpu"] = cpu
 
     except Exception as e:
-
         LAST_ERROR = str(e)
-
         data["ram"] = "Unknown"
         data["cpu"] = "Unknown"
 
-    uptime = int(
-
-        time() - BOT_START_TIME
-
-    )
+    # ================= UPTIME =================
+    uptime = int(time() - BOT_START_TIME)
 
     days = uptime // 86400
-
     hours = (uptime % 86400) // 3600
-
     minutes = (uptime % 3600) // 60
 
-    data["uptime"] = (
-
-        f"{days}d "
-
-        f"{hours}h "
-
-        f"{minutes}m"
-
-    )
-
+    data["uptime"] = f"{days}d {hours}h {minutes}m"
     data["version"] = BOT_VERSION
-
     data["error"] = LAST_ERROR
 
+    # ================= SQLITE =================
+    try:
+        cursor.execute("SELECT COUNT(*) FROM tickets")
+        data["tickets"] = cursor.fetchone()[0]
+    except:
+        data["tickets"] = 0
 
-data = {}
+    # ================= PENDING =================
+    data["pending"] = len(pending_reply)
 
+    # ================= DB SIZE =================
+    try:
+        size = os.path.getsize("tickets.db")
+        data["dbsize"] = round(size / 1024, 2)
+    except:
+        data["dbsize"] = 0
 
-# ================= SQLITE =================
+    # ================= TELEGRAM =================
+    data["telegram"] = "🟢 OK"
 
+    # ================= POLLING =================
+    data["polling"] = "🟢 Running"
 
-try:
-
-    cursor.execute(
-
-        "SELECT COUNT(*) FROM tickets"
-
-    )
-
-    total_tickets = cursor.fetchone()[0]
-
-
-except:
-
-    total_tickets = 0
-
-
-data["tickets"] = total_tickets
-
-
-# ================= Pending =================
-
-
-data["pending"] = len(
-
-    pending_reply
-
-)
-
-
-# ================= DB SIZE =================
-
-
-try:
-
-    size = os.path.getsize(
-
-        "tickets.db"
-
-    )
-
-    size = round(
-
-        size / 1024,
-
-        2
-
-    )
-
-
-except:
-
-    size = 0
-
-
-data["dbsize"] = size
-
-
-# ================= Telegram =================
-
-
-data["telegram"] = "🟢 OK"
-
-
-# ================= Polling =================
-
-
-data["polling"] = "🟢 Running"
+    return data
 
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
