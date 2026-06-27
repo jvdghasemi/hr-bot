@@ -102,26 +102,71 @@ pending_reply = {}
 
 
 def ai_faq(text):
-    text = text.lower().strip()
+    text = text.lower()
 
     intents = [
-        ("سرویس", ["سرویس", "ایاب ذهاب", "رفت و آمد",
-         "اتوبوس", "سرویس شرکت"], "🛡 انتظامات"),
-        ("وام", ["وام", "تسهیلات", "صندوق", "کارگشایی"], "💰 تسهیلات رفاهی"),
-        ("پارکینگ", ["پارکینگ", "جای پارک", "پارک خودرو"], "🛡 انتظامات"),
-        ("مرخصی", ["مرخصی", "استراحت", "غیبت", "ساعتی"], "🏖 مرخصی"),
+        {
+            "key": "سرویس",
+            "keywords": [
+                "سرویس",
+                "ایاب ذهاب",
+                "رفت و آمد",
+                "اتوبوس",
+                "شرکت سرویس",
+                "چطور میریم شرکت"
+            ],
+            "answer": "🛡 انتظامات"
+        },
+        {
+            "key": "وام",
+            "keywords": [
+                "وام",
+                "وام میدن",
+                "تسهیلات",
+                "صندوق",
+                "کارگشایی",
+                "پول قرض"
+            ],
+            "answer": "💰 تسهیلات رفاهی"
+        },
+        {
+            "key": "پارکینگ",
+            "keywords": [
+                "پارکینگ",
+                "جای پارک",
+                "ماشین کجا بذارم",
+                "پارک خودرو"
+            ],
+            "answer": "🛡 انتظامات"
+        },
+        {
+            "key": "مرخصی",
+            "keywords": [
+                "مرخصی",
+                "استراحت",
+                "چند روز مرخصی",
+                "مرخصی ساعتی",
+                "غیبت"
+            ],
+            "answer": "🏖 مرخصی"
+        }
     ]
 
-    best = (0, None)
+    best_score = 0
+    best_answer = None
 
-    for key, keywords, answer in intents:
-        for kw in keywords:
-            score = fuzz.token_set_ratio(text, kw)
+    for intent in intents:
+        for kw in intent["keywords"]:
+            score = fuzz.partial_ratio(text, kw.lower())
 
-            if score > best[0]:
-                best = (score, answer)
+            if score > best_score:
+                best_score = score
+                best_answer = intent["answer"]
 
-    return best[1] if best[0] >= 65 else None
+    if best_score >= 70:
+        return best_answer
+
+    return None
 
 
 async def health_check():
@@ -248,10 +293,13 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text
 
-    faq_answer = ai_faq(text)
+    faq_text = ai_faq(text)
 
-    if faq_answer:
-        await update.message.reply_text(faq_answer)
+    if faq_text:
+        await update.message.reply_text(faq_text)
+    else:
+        await update.message.reply_text("❌ اطلاعاتی برای این بخش پیدا نشد.")
+
         return
 
     if text == "🔧 سلامت ربات":
