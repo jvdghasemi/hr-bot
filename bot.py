@@ -1,24 +1,4 @@
-from time import time
-from datetime import datetime
-from rapidfuzz import fuzz
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from database import conn, cursor
-from telegram.ext import CallbackQueryHandler
-import pytz
-import random
-import jdatetime
-import asyncio
-import os
-import logging
-import traceback
-import sqlite3
-import psutil
-
-from telegram import (
-    Update,
-    ReplyKeyboardMarkup,
-    MenuButtonCommands
-)
+import threading
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -26,6 +6,29 @@ from telegram.ext import (
     filters,
     ContextTypes
 )
+from telegram import (
+    Update,
+    ReplyKeyboardMarkup,
+    MenuButtonCommands
+)
+from datetime import datetime
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import CallbackQueryHandler
+import pytz
+import random
+import jdatetime
+import asyncio
+import os
+import logging
+import psutil
+import sqlite3
+import time
+BOT_START_TIME = time.time()
+
+db_lock = threading.Lock()
+
+conn = sqlite3.connect("tickets.db", check_same_thread=False)
+cursor = conn.cursor()
 
 logging.basicConfig(
 
@@ -41,8 +44,6 @@ ADMIN_IDS = [
 ]
 
 ADMIN_GROUP_ID = -1004433309113
-
-BOT_START_TIME = time()
 
 BOT_VERSION = "2.0.0"
 
@@ -99,74 +100,6 @@ def get_markup(user_id):
 
 
 pending_reply = {}
-
-
-def ai_faq(text):
-    text = text.lower()
-
-    intents = [
-        {
-            "key": "سرویس",
-            "keywords": [
-                "سرویس",
-                "ایاب ذهاب",
-                "رفت و آمد",
-                "اتوبوس",
-                "شرکت سرویس",
-                "چطور میریم شرکت"
-            ],
-            "answer": "🛡 انتظامات"
-        },
-        {
-            "key": "وام",
-            "keywords": [
-                "وام",
-                "وام میدن",
-                "تسهیلات",
-                "صندوق",
-                "کارگشایی",
-                "پول قرض"
-            ],
-            "answer": "💰 تسهیلات رفاهی"
-        },
-        {
-            "key": "پارکینگ",
-            "keywords": [
-                "پارکینگ",
-                "جای پارک",
-                "ماشین کجا بذارم",
-                "پارک خودرو"
-            ],
-            "answer": "🛡 انتظامات"
-        },
-        {
-            "key": "مرخصی",
-            "keywords": [
-                "مرخصی",
-                "استراحت",
-                "چند روز مرخصی",
-                "مرخصی ساعتی",
-                "غیبت"
-            ],
-            "answer": "🏖 مرخصی"
-        }
-    ]
-
-    best_score = 0
-    best_answer = None
-
-    for intent in intents:
-        for kw in intent["keywords"]:
-            score = fuzz.partial_ratio(text, kw.lower())
-
-            if score > best_score:
-                best_score = score
-                best_answer = intent["answer"]
-
-    if best_score >= 70:
-        return best_answer
-
-    return None
 
 
 async def health_check():
@@ -291,16 +224,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     user_id = update.effective_user.id
-    text = update.message.text
-
-    faq_text = ai_faq(text)
-
-    if faq_text:
-        await update.message.reply_text(faq_text)
-    else:
-        await update.message.reply_text("❌ اطلاعاتی برای این بخش پیدا نشد.")
-
-        return
+    text = update.message.text or ""
 
     if text == "🔧 سلامت ربات":
 
@@ -440,12 +364,12 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id=ADMIN_GROUP_ID,
             text=f"✅ تیکت #{ticket_id} پاسخ داده و بسته شد."
         )
-
-        del pending_reply[user_id]
-        cursor.execute(
-            "DELETE FROM tickets WHERE ticket_id=?",
-            (ticket_id,)
-        )
+        with db_lock:
+            del pending_reply[user_id]
+            cursor.execute(
+                "DELETE FROM tickets WHERE ticket_id=?",
+                (ticket_id,)
+            )
 
         conn.commit()
 
@@ -501,39 +425,40 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         voice_id = update.message.voice.file_id if update.message.voice else None
         ticket_text = text if text else "☝️ پیام صوتی ارسال کردید که بالای همین پیام است."
 
-        cursor.execute("""
-        INSERT INTO tickets
-        (
-            ticket_id,
-            user_id,
-            chat_id,
-            name,
-            username,
-            text,
-            voice_id,
-            date,
-            time
-        )
+        with db_lock:
+            cursor.execute("""
+            INSERT INTO tickets
+            (
+                ticket_id,
+                user_id,
+                chat_id,
+                name,
+                username,
+                text,
+                voice_id,
+                date,
+                time
+            )
                        
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
 
-            ticket_id,
-            user.id,
-            update.effective_chat.id,
+                ticket_id,
+                user.id,
+                update.effective_chat.id,
 
-            user.first_name,
-            username,
+                user.first_name,
+                username,
 
-            ticket_text,
-            voice_id,
+                ticket_text,
+                voice_id,
 
-            shamsi_date,
-            shamsi_time
+                shamsi_date,
+                shamsi_time
 
-        ))
+            ))
 
-        conn.commit()
+            conn.commit()
 
         keyboard = InlineKeyboardMarkup(
             [
