@@ -102,57 +102,26 @@ pending_reply = {}
 
 
 def ai_faq(text):
-    text = text.lower()
+    text = text.lower().strip()
 
     intents = [
-        {
-            "key": "سرویس",
-            "keywords": [
-                "سرویس", "ایاب ذهاب", "رفت و آمد", "اتوبوس", "شرکت سرویس", "چطور میریم شرکت"
-            ],
-            "answer": "🛡 انتظامات"
-        },
-
-        {
-            "key": "وام",
-            "keywords": [
-                "وام", "وام میدن", "تسهیلات", "صندوق", "کارگشایی", "پول قرض"
-            ],
-            "answer": "💰 تسهیلات رفاهی"
-        },
-
-        {
-            "key": "پارکینگ",
-            "keywords": [
-                "پارکینگ", "جای پارک", "ماشین کجا بذارم", "پارک خودرو"
-            ],
-            "answer": "🛡 انتظامات"
-        },
-
-        {
-            "key": "مرخصی",
-            "keywords": [
-                "مرخصی", "استراحت", "چند روز مرخصی", "مرخصی ساعتی", "غیبت"
-            ],
-            "answer": "🏖 مرخصی"
-        }
+        ("سرویس", ["سرویس", "ایاب ذهاب", "رفت و آمد",
+         "اتوبوس", "سرویس شرکت"], "🛡 انتظامات"),
+        ("وام", ["وام", "تسهیلات", "صندوق", "کارگشایی"], "💰 تسهیلات رفاهی"),
+        ("پارکینگ", ["پارکینگ", "جای پارک", "پارک خودرو"], "🛡 انتظامات"),
+        ("مرخصی", ["مرخصی", "استراحت", "غیبت", "ساعتی"], "🏖 مرخصی"),
     ]
 
-    best_score = 0
-    best_answer = None
+    best = (0, None)
 
-    for intent in intents:
-        for kw in intent["keywords"]:
-            score = fuzz.partial_ratio(text, kw.lower())
+    for key, keywords, answer in intents:
+        for kw in keywords:
+            score = fuzz.token_set_ratio(text, kw)
 
-            if score > best_score:
-                best_score = score
-                best_answer = intent["answer"]
+            if score > best[0]:
+                best = (score, answer)
 
-    if best_score >= 70:
-        return best_answer
-
-    return None
+    return best[1] if best[0] >= 65 else None
 
 
 async def health_check():
@@ -273,15 +242,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    if faq_answer:
-        await update.message.reply_text(faq_answer)
-        return
-
     if not update.message:
         return
 
     user_id = update.effective_user.id
     text = update.message.text
+
+    if faq_answer:
+        await update.message.reply_text(faq_answer)
+        return
 
     faq_answer = ai_faq(text)
 
