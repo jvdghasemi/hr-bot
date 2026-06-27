@@ -248,11 +248,11 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text
 
+    faq_answer = ai_faq(text)
+
     if faq_answer:
         await update.message.reply_text(faq_answer)
         return
-
-    faq_answer = ai_faq(text)
 
     if text == "🔧 سلامت ربات":
 
