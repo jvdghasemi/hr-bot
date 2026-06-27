@@ -839,10 +839,18 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    if update.effective_chat.type != "private":
+    else:
+
+        await update.message.reply_text(
+
+            "❌ سوال شما در پایگاه دانش یافت نشد.\n\n"
+
+            "لطفااز منو انتخاب کنید یا سوال خود را واضح‌تر بنویسید."
+
+        )
+
         return
 
-    await update.message.reply_text("از منو انتخاب کن")
 
 # ================== MAIN ==================
 
