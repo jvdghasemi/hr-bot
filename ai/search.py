@@ -1,31 +1,35 @@
 import pickle
+import os
 import numpy as np
-from ai.settings import SIMILARITY_THRESHOLD
-from ai.embedder import embed
-from ai.index import load_index
+import faiss
+from .model import model
+from .settings import SIMILARITY_THRESHOLD, TOP_K, DATA_DIR
 
 
 class SemanticSearch:
     def __init__(self):
-        self.index = load_index()
+        index_path = os.path.join(DATA_DIR, "faiss.index")
+        docs_path = os.path.join(DATA_DIR, "documents.pkl")
 
-        with open("data/documents.pkl", "rb") as f:
+        self.index = faiss.read_index(index_path)
+
+        with open(docs_path, "rb") as f:
             self.documents = pickle.load(f)
 
-    def ask(self, text, top_k=1):
-        vector = embed(text).astype(np.float32).reshape(1, -1)
+        print(f"SemanticSearch ready: {len(self.documents)} documents loaded.")
 
-        scores, indices = self.index.search(vector, top_k)
+    def ask(self, text: str) -> dict | None:
+        vector = model.encode(text, normalize_embeddings=True)
+        vector = np.array(vector, dtype=np.float32).reshape(1, -1)
+
+        scores, indices = self.index.search(vector, TOP_K)
 
         score = float(scores[0][0])
         idx = int(indices[0][0])
 
-        print(f"Score: {score}")
+        print(f"[AI] query='{text[:40]}' score={score:.3f} threshold={SIMILARITY_THRESHOLD}")
 
-        if idx == -1:
-            return None
-
-        if score < SIMILARITY_THRESHOLD:
+        if idx == -1 or score < SIMILARITY_THRESHOLD:
             return None
 
         return self.documents[idx]

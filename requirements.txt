@@ -2,10 +2,7 @@ python-telegram-bot==22.1
 pytz
 jdatetime
 psutil
-rapidfuzz==3.6.1
 sentence-transformers==5.1.0
-numpy==2.3.1
+numpy
 torch
-transformers
 faiss-cpu
-huggingface-hub

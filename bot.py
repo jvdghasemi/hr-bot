@@ -152,8 +152,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query.data.startswith("reply_"):
         ticket_id = int(query.data.split("_")[1])
 
-        cursor.execute(
-            "SELECT ticket_id FROM tickets WHERE ticket_id=?", (ticket_id,))
+        cursor.execute("SELECT ticket_id FROM tickets WHERE ticket_id=?", (ticket_id,))
         ticket = cursor.fetchone()
 
         if ticket is None:
@@ -243,8 +242,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             del pending_reply[user_id]
             return
 
-        (_, _, user_chat_id, ticket_name, username, ticket_text,
-         voice_id, ticket_date, ticket_time) = ticket
+        (_, _, user_chat_id, ticket_name, username, ticket_text, voice_id, ticket_date, ticket_time) = ticket
 
         message = (
             f"👤 {ticket_name}\n"
@@ -276,8 +274,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         with db_lock:
             del pending_reply[user_id]
-            cursor.execute(
-                "DELETE FROM tickets WHERE ticket_id=?", (ticket_id,))
+            cursor.execute("DELETE FROM tickets WHERE ticket_id=?", (ticket_id,))
         conn.commit()
         return
 
@@ -305,15 +302,13 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         while True:
             ticket_id = random.randint(100000, 999999)
-            cursor.execute(
-                "SELECT 1 FROM tickets WHERE ticket_id=?", (ticket_id,))
+            cursor.execute("SELECT 1 FROM tickets WHERE ticket_id=?", (ticket_id,))
             if cursor.fetchone() is None:
                 break
 
         tehran = pytz.timezone("Asia/Tehran")
         now = datetime.now(tehran)
-        shamsi_date = jdatetime.datetime.fromgregorian(
-            datetime=now).strftime("%Y/%m/%d")
+        shamsi_date = jdatetime.datetime.fromgregorian(datetime=now).strftime("%Y/%m/%d")
         shamsi_time = now.strftime("%H:%M")
 
         voice_id = update.message.voice.file_id if update.message.voice else None
@@ -332,8 +327,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             conn.commit()
 
         reply_markup = InlineKeyboardMarkup(
-            [[InlineKeyboardButton("📩 پاسخ به این تیکت",
-                                   callback_data=f"reply_{ticket_id}")]]
+            [[InlineKeyboardButton("📩 پاسخ به این تیکت", callback_data=f"reply_{ticket_id}")]]
         )
 
         info = (

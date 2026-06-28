@@ -13,6 +13,28 @@ faq_cache = []
 def load_faq_cache():
     global faq_cache
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     cursor.execute("SELECT category, content, embedding FROM faq")
     rows = cursor.fetchall()
 
