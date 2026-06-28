@@ -3,3 +3,9 @@ pytz
 jdatetime
 psutil
 rapidfuzz==3.6.1
+sentence-transformers==5.1.0
+numpy==2.3.1
+torch
+transformers
+faiss-cpu
+huggingface-hub

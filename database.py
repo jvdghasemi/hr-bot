@@ -17,4 +17,19 @@ CREATE TABLE IF NOT EXISTS tickets (
 )
 """)
 
+cursor.execute("""
+
+CREATE TABLE IF NOT EXISTS statistics(
+
+    name TEXT PRIMARY KEY,
+
+    count INTEGER DEFAULT 0
+
+)
+
+""")
+
+conn.commit()
+
+
 conn.commit()

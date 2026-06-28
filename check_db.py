@@ -1,16 +1,30 @@
 import sqlite3
 
-conn = sqlite3.connect("tickets.db")  # یا bot.db همون که استفاده می‌کنی
+conn = sqlite3.connect("faq.db")
 cursor = conn.cursor()
 
-cursor.execute("SELECT * FROM tickets")
-rows = cursor.fetchall()
+# نمایش جدول‌ها
+cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+tables = cursor.fetchall()
 
-print("ALL TICKETS:")
-for r in rows:
-    print(r)
+print("Tables:")
+for table in tables:
+    print(table[0])
+
+print("\nColumns:")
+
+for table in tables:
+    print(f"\n--- {table[0]} ---")
+    cursor.execute(f"PRAGMA table_info({table[0]});")
+    for column in cursor.fetchall():
+        print(column)
 
 conn.close()
 
-for row in rows:
-    print("FUUL ROW", row)
+conn = sqlite3.connect("faq.db")
+cursor = conn.cursor()
+
+cursor.execute("SELECT COUNT(*) FROM faq")
+print(cursor.fetchone())
+
+conn.close()

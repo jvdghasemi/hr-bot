@@ -1,4 +1,5 @@
 import threading
+from ai.search import SemanticSearch
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -37,6 +38,8 @@ logging.basicConfig(
     format='%(asctime)s - %(message)s'
 
 )
+
+ai = SemanticSearch()
 
 TOKEN = os.getenv("TOKEN")
 ADMIN_IDS = [
@@ -637,6 +640,8 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "در صورت تمایل به قطع همکاری، باید حداقل یک ماه قبل، درخواست خود را به‌صورت کتبی به مدیر واحد اعلام کنید."
 
         )
+        return
+
     elif text == "📍 حضور و غیاب و تردد":
         await update.message.reply_text(
 
@@ -840,6 +845,12 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "برگشت به منو",
             reply_markup=get_markup(user_id)
         )
+        return
+
+    result = ai.ask(update.message.text)
+
+    if result:
+        await update.message.reply_text(result["content"])
         return
 
     else:
