@@ -366,8 +366,12 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ================== منوی اصلی ==================
 
     if text == "🤝 فرصت های شغلی":
-        await update.message.reply_text("کلید 1")
-        return
+        with open("jobs.jpg", "rb") as photo:
+            await update.message.reply_photo(
+                photo=photo,
+                caption="📢 فرصت های شغلی شرکت داروسازی ایران هورمون"
+            )
+            return
 
     elif text == "📝 پیام مدیر عامل":
         await update.message.reply_text(
