@@ -7,6 +7,7 @@ import sqlite3
 conn = sqlite3.connect("faq.db")
 cursor = conn.cursor()
 
+cursor.execute("DROP TABLE IF EXISTS faq")
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS faq (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

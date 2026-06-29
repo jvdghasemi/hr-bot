@@ -1,3 +1,4 @@
+import time
 import pickle
 import os
 import numpy as np
@@ -18,18 +19,26 @@ class SemanticSearch:
 
         print(f"SemanticSearch ready: {len(self.documents)} documents loaded.")
 
-    def ask(self, text: str) -> dict | None:
-        vector = model.encode(text, normalize_embeddings=True)
-        vector = np.array(vector, dtype=np.float32).reshape(1, -1)
 
-        scores, indices = self.index.search(vector, TOP_K)
+def ask(self, text: str) -> dict | None:
+    t0 = time.time()
 
-        score = float(scores[0][0])
-        idx = int(indices[0][0])
+    vector = model.encode(text, normalize_embeddings=True)
+    print(f"[TIME] Encode: {time.time()-t0:.2f}s")
 
-        print(f"[AI] query='{text[:40]}' score={score:.3f} threshold={SIMILARITY_THRESHOLD}")
+    t1 = time.time()
 
-        if idx == -1 or score < SIMILARITY_THRESHOLD:
-            return None
+    vector = np.array(vector, dtype=np.float32).reshape(1, -1)
+    scores, indices = self.index.search(vector, TOP_K)
 
-        return self.documents[idx]
+    print(f"[TIME] Search: {time.time()-t1:.4f}s")
+
+    score = float(scores[0][0])
+    idx = int(indices[0][0])
+
+    print(f"[AI] score={score:.3f}")
+
+    if idx == -1 or score < SIMILARITY_THRESHOLD:
+        return None
+
+    return self.documents[idx]
