@@ -537,7 +537,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    elif text == "💻 فناوری اطلاعات":
+    elif text == "💻 فناوری اطلاعات" in text:
         await update.message.reply_text(
             "💻 فناوری اطلاعات\n\n"
             "❓ سوال:\nآیا در استفاده شخصی، از امکانات نرم افزاری و سخت افزاری شرکت، محدودیتی وجود دارد؟\n\n"
