@@ -2,7 +2,3 @@ python-telegram-bot==22.1
 pytz
 jdatetime
 psutil
-sentence-transformers==5.1.0
-numpy
-torch
-faiss-cpu
