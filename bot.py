@@ -208,14 +208,56 @@ def build_admin_panel_home(user_id: int):
     return text, markup
 
 
-def build_admin_list_view(actor_id: int):
-    """لیست همه ادمین‌ها به صورت دکمه؛ با زدن هرکدام جزئیات و عملیات باز می‌شود."""
-    admins = admin_system.list_admins()
+ADMIN_LIST_PAGE_SIZE = 10
+
+
+def build_admin_list_view(actor_id: int, page: int = 0):
+    """
+    لیست همه ادمین‌ها (فقط از bot.db -> جدول admins، از طریق
+    admin_system.list_admins) به‌صورت دکمه‌های شیشه‌ای؛ با زدن هرکدام
+    جزئیات و عملیات باز می‌شود.
+
+    BUGFIX: قبلاً وقتی جدول admins خالی بود (یا کاربر فعلی در آن ثبت نشده
+    بود) هیچ پیام روشنی نشان داده نمی‌شد و کاربر فقط یک صفحه‌ی تقریباً
+    خالی با دکمه‌ی «بازگشت» می‌دید — انگار لیست «شکسته» است. اکنون این حالت
+    صریحاً تشخیص داده شده و پیام «هیچ ادمینی یافت نشد» نمایش داده می‌شود.
+    """
+    admins = admin_system.list_admins()  # NEW: تنها منبع داده -> bot.db/admins (هیچ ADMIN_IDS یا مقدار ثابتی استفاده نمی‌شود)
+
+    if not admins:
+        text = (
+            "👥 لیست ادمین‌ها\n\n"
+            "❌ هیچ ادمینی در دیتابیس (bot.db → admins) یافت نشد."
+        )
+        buttons = []
+        if admin_system.can_manage_admins(actor_id):
+            buttons.append([InlineKeyboardButton("➕ افزودن ادمین جدید", callback_data="adm_addprompt")])
+        buttons.append([InlineKeyboardButton("🔙 بازگشت", callback_data="adm_home")])
+        return text, InlineKeyboardMarkup(buttons)
+
+    # ── Pagination (در صورت بیش از ۱۰ ادمین) ──
+    total = len(admins)
+    total_pages = max(1, (total + ADMIN_LIST_PAGE_SIZE - 1) // ADMIN_LIST_PAGE_SIZE)
+    page = max(0, min(page, total_pages - 1))
+
+    start = page * ADMIN_LIST_PAGE_SIZE
+    page_admins = admins[start:start + ADMIN_LIST_PAGE_SIZE]
 
     buttons = []
-    for uid, level, full_name in admins:
-        label = f"{admin_system.LEVEL_NAMES.get(level, '?')} — {admin_system.get_admin_display_name(uid, full_name)}"
+    for uid, level, full_name in page_admins:
+        display_name = admin_system.get_admin_display_name(uid, full_name)
+        label = f"👤 {display_name} | 🟡 Level {level} ({admin_system.LEVEL_NAMES.get(level, '?')})"
         buttons.append([InlineKeyboardButton(label, callback_data=f"adm_view_{uid}")])
+
+    # ── دکمه‌های ناوبری صفحه ──
+    if total_pages > 1:
+        nav_row = []
+        if page > 0:
+            nav_row.append(InlineKeyboardButton("◀️ قبلی", callback_data=f"adm_list_p_{page - 1}"))
+        nav_row.append(InlineKeyboardButton(f"📄 {page + 1}/{total_pages}", callback_data="adm_noop"))
+        if page < total_pages - 1:
+            nav_row.append(InlineKeyboardButton("بعدی ▶️", callback_data=f"adm_list_p_{page + 1}"))
+        buttons.append(nav_row)
 
     # افزودن ادمین جدید فقط برای کسانی که مجوز manage_admins دارند
     if admin_system.can_manage_admins(actor_id):
@@ -223,7 +265,10 @@ def build_admin_list_view(actor_id: int):
 
     buttons.append([InlineKeyboardButton("🔙 بازگشت", callback_data="adm_home")])
 
-    text = "👥 لیست ادمین‌ها\n\nبرای مشاهده جزئیات و تغییر سطح، روی یک ادمین بزنید:"
+    text = (
+        f"👥 لیست ادمین‌ها ({total} نفر)\n\n"
+        "برای مشاهده جزئیات و تغییر سطح، روی یک ادمین بزنید:"
+    )
     return text, InlineKeyboardMarkup(buttons)
 
 
@@ -236,10 +281,23 @@ def build_admin_detail_view(target_id: int, actor_id: int):
         buttons = [[InlineKeyboardButton("🔙 بازگشت", callback_data="adm_list")]]
         return text, InlineKeyboardMarkup(buttons)
 
+    # NEW: نام نمایشی از روی full_name ثبت‌شده در bot.db (در صورت وجود)، در
+    # غیر این صورت خود user_id - دقیقاً طبق فرمت درخواستی
+    full_name = ""
+    for uid, lvl, name in admin_system.list_admins():
+        if uid == target_id:
+            full_name = name or ""
+            break
+    display_name = full_name if full_name else str(target_id)
+
     level_name = admin_system.LEVEL_NAMES.get(level, "?")
+    permissions_text = admin_system.get_permissions_text(level)
+
     text = (
-        f"👤 کاربر: {target_id}\n"
-        f"📊 سطح فعلی: {level_name}\n\n"
+        f"👤 {display_name}\n"
+        f"🆔 User ID: {target_id}\n"
+        f"🟡 Level: {level} ({level_name})\n\n"
+        f"🔑 Permissions:\n{permissions_text}\n\n"
         f"می‌خواهید چه تغییری اعمال شود؟"
     )
 
@@ -297,7 +355,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # (مثلاً «🔙 بازگشت» یا «❌ لغو») از آن جریان خارج شد، این فلگ‌ها باید پاک
     # شوند؛ در غیر این صورت پیام بعدی او به اشتباه به‌عنوان ورودی همان جریان
     # تفسیر می‌شد و کاربر برای همیشه در آن حالت گیر می‌کرد.
-    if query.data in ("adm_home", "adm_list") or query.data.startswith("adm_view_"):
+    if (query.data in ("adm_home", "adm_list") or query.data.startswith("adm_view_")
+            or query.data.startswith("adm_list_p_")):
         context.user_data["awaiting_new_admin"] = False
         context.user_data["awaiting_transfer_owner"] = False
 
@@ -349,7 +408,20 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if query.data == "adm_list":
-        text, markup = build_admin_list_view(user_id)
+        text, markup = build_admin_list_view(user_id, page=0)
+        await query.edit_message_text(text, reply_markup=markup)
+        return
+
+    if query.data == "adm_noop":
+        # دکمه‌ی نمایش شماره صفحه - فقط نمایشی است، هیچ عملی انجام نمی‌دهد
+        return
+
+    if query.data.startswith("adm_list_p_"):
+        try:
+            page = int(query.data.replace("adm_list_p_", ""))
+        except ValueError:
+            page = 0
+        text, markup = build_admin_list_view(user_id, page=page)
         await query.edit_message_text(text, reply_markup=markup)
         return
 

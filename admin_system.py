@@ -366,8 +366,9 @@ def remove_admin(target_id: int, actor_id: int) -> tuple[bool, str]:
 
 def list_admins() -> list[tuple]:
     """لیست همه ادمین‌ها: [(user_id, level, full_name), ...] — به‌علاوه Owner از env (اگر در جدول نباشد)."""
-    _cursor.execute("SELECT user_id, level, full_name FROM admins ORDER BY level ASC, user_id ASC")
-    rows = list(_cursor.fetchall())
+    with _db_lock:
+        _cursor.execute("SELECT user_id, level, full_name FROM admins ORDER BY level ASC, user_id ASC")
+        rows = list(_cursor.fetchall())
 
     if OWNER_ID is not None and not any(r[0] == OWNER_ID for r in rows):
         rows.insert(0, (OWNER_ID, LEVEL_SUPER_OWNER, "Owner (env)"))
@@ -379,6 +380,16 @@ def get_admin_display_name(user_id: int, full_name: str = "") -> str:
     if full_name:
         return f"{full_name} ({user_id})"
     return str(user_id)
+
+
+def get_permissions_text(level: int) -> str:
+    """متن خوانا از مجوزهای یک سطح دسترسی - برای نمایش در جزئیات ادمین."""
+    if level == LEVEL_SUPER_OWNER:
+        return "همه‌ی دسترسی‌ها (Full Access)"
+    perms = LEVEL_PERMISSIONS.get(level, set())
+    if not perms:
+        return "—"
+    return "، ".join(sorted(perms))
 
 
 # ================== NEW: انتقال مالکیت (Transfer Ownership) ==================
