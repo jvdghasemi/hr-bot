@@ -38,6 +38,7 @@ LAST_ERROR = "None"
 
 TOKEN = os.getenv("TOKEN")
 
+ADMIN_IDS = [7186618503, 8040436465, 866732263, 34406542, ]
 ADMIN_GROUP_ID = -1004433309113
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -102,7 +103,7 @@ admin_markup = ReplyKeyboardMarkup(admin_keyboard, resize_keyboard=True)
 
 def get_markup(user_id):
     # NEW: ادمین قدیمی (ADMIN_IDS) یا ادمین ثبت‌شده در admin_system هر دو منوی ادمین می‌بینند
-    if user_id in admin_system.is_admin(user_id):
+    if user_id in ADMIN_IDS or admin_system.is_admin(user_id):
         return admin_markup
     return user_markup
 
@@ -362,7 +363,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
     # NEW: علاوه بر ADMIN_IDS قدیمی، ادمین‌های ثبت‌شده در admin_system هم مجاز هستند
-    is_legacy_or_new_admin = user_id in admin_system.is_admin(
+    is_legacy_or_new_admin = user_id in ADMIN_IDS or admin_system.is_admin(
         user_id)
 
     if not is_legacy_or_new_admin:
@@ -606,7 +607,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ── NEW: آمار ربات (داشبورد کامل، فقط ادمین) ──
     if text == "📊 آمار ربات":
-        if not (user_id in admin_system.has_permission(user_id, "view_stats")):
+        if not (user_id in ADMIN_IDS or admin_system.has_permission(user_id, "view_stats")):
             await update.message.reply_text("❌ شما مجوز مشاهده آمار را ندارید.")
             return
 
@@ -616,7 +617,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ── NEW: ورود به پنل مدیریت گرافیکی (دکمه‌ای) ──
     if text == "🛠 پنل مدیریت":
-        if not (user_id in admin_system.is_admin(user_id)):
+        if not (user_id in ADMIN_IDS or admin_system.is_admin(user_id)):
             await update.message.reply_text("❌ شما ادمین نیستید.")
             return
 
@@ -641,7 +642,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # برای آن‌ها اجرا نمی‌شد، پیام بعدی‌شان به اشتباه به بخش‌های دیگر منو
     # می‌رفت و آن‌ها برای همیشه در pending_reply گیر می‌کردند (تیکت هم هرگز
     # پاسخ داده نمی‌شد). اکنون admin_system.is_admin هم در نظر گرفته می‌شود.
-    if (user_id in admin_system.is_admin(user_id)) and user_id in pending_reply:
+    if (user_id in ADMIN_IDS or admin_system.is_admin(user_id)) and user_id in pending_reply:
         if update.message.voice:
             await update.message.reply_text(
                 "❌ پاسخ تیکت فقط باید به صورت متنی ارسال شود."
