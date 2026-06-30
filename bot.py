@@ -25,6 +25,9 @@ import psutil
 import sqlite3
 import time
 
+# NEW: ماژول آمار و سیستم سطح دسترسی ادمین‌ها (پنل کاملاً دکمه‌ای InlineKeyboard)
+import admin_system
+
 # ================== INIT ==================
 
 BOT_START_TIME = time.time()
@@ -39,6 +42,9 @@ ADMIN_GROUP_ID = -1004433309113
 db_lock = threading.Lock()
 conn = sqlite3.connect("tickets.db", check_same_thread=False)
 cursor = conn.cursor()
+
+# NEW: اتصال ماژول admin_system به همان دیتابیس اصلی (tickets.db) - بدون فایل دیتابیس جداگانه
+admin_system.bind_connection(conn, cursor, db_lock)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
 
@@ -56,7 +62,8 @@ admin_keyboard = [
     ["❓ سوالات پر تکرار", "🌐 شبکه های اجتماعی"],
     ["📝 پیام مدیر عامل", "🤝 فرصت های شغلی"],
     ["🎙️ صدای کارکنان", "📞 تماس‌ با ما"],
-    ["🔧 سلامت ربات"],
+    ["🔧 سلامت ربات", "📊 آمار ربات"],
+    ["🛠 پنل مدیریت"],
 ]
 
 social_keyboard = ReplyKeyboardMarkup(
@@ -87,7 +94,20 @@ admin_markup = ReplyKeyboardMarkup(admin_keyboard, resize_keyboard=True)
 
 
 def get_markup(user_id):
-    return admin_markup if user_id in ADMIN_IDS else user_markup
+    # NEW: ادمین قدیمی (ADMIN_IDS) یا ادمین ثبت‌شده در admin_system هر دو منوی ادمین می‌بینند
+    if user_id in ADMIN_IDS or admin_system.is_admin(user_id):
+        return admin_markup
+    return user_markup
+
+
+# NEW: بخش‌هایی که آمار بازدیدشان برای پنل آمار ثبت می‌شود
+TRACKED_SECTIONS = {
+    "❓ سوالات پر تکرار", "🌐 شبکه های اجتماعی", "📝 پیام مدیر عامل",
+    "🤝 فرصت های شغلی", "🎙️ صدای کارکنان", "📞 تماس‌ با ما",
+    "📄 قرارداد و استخدام", "📍 حضور و غیاب و تردد", "➕ اضافه کاری",
+    "🏖 مرخصی", "🛡 انتظامات", "🍽 غذا و پذیرایی",
+    "💻 فناوری اطلاعات", "💰 تسهیلات رفاهی", "🎓 آموزش",
+}
 
 
 # ================== HEALTH CHECK ==================
@@ -134,6 +154,106 @@ async def health_check():
     return data
 
 
+# ================== NEW: پنل مدیریت گرافیکی (InlineKeyboard) ==================
+#
+# طراحی callback_data:
+#   adm_home                          -> صفحه اصلی پنل
+#   adm_list                          -> لیست ادمین‌ها (هر کدام یک دکمه)
+#   adm_view_<user_id>                -> نمایش جزئیات یک ادمین + دکمه‌های عملیات
+#   adm_setlvl_<user_id>_<level>      -> تنظیم سطح دسترسی (ارتقا/تنزل)
+#   adm_remove_<user_id>              -> حذف ادمین
+#   adm_addprompt                     -> شروع جریان «افزودن ادمین جدید» (درخواست فوروارد پیام)
+#   adm_cancel                        -> بازگشت/لغو
+#
+# همه عملیات قبل از اجرا از admin_system (لایه permission) عبور می‌کنند.
+
+
+def build_admin_panel_home(user_id: int):
+    """صفحه اصلی پنل مدیریت."""
+    level = admin_system.get_admin_level(user_id)
+    level_name = admin_system.LEVEL_NAMES.get(level, "ادمین (لیست قدیمی)")
+
+    text = (
+        f"🛠 پنل مدیریت\n\n"
+        f"سطح دسترسی شما: {level_name}\n\n"
+        f"یکی از گزینه‌های زیر را انتخاب کنید:"
+    )
+
+    buttons = [[InlineKeyboardButton("👥 مدیریت ادمین‌ها", callback_data="adm_list")]]
+
+    markup = InlineKeyboardMarkup(buttons)
+    return text, markup
+
+
+def build_admin_list_view(actor_id: int):
+    """لیست همه ادمین‌ها به صورت دکمه؛ با زدن هرکدام جزئیات و عملیات باز می‌شود."""
+    admins = admin_system.list_admins()
+
+    buttons = []
+    for uid, level, full_name in admins:
+        label = f"{admin_system.LEVEL_NAMES.get(level, '?')} — {admin_system.get_admin_display_name(uid, full_name)}"
+        buttons.append([InlineKeyboardButton(label, callback_data=f"adm_view_{uid}")])
+
+    # افزودن ادمین جدید فقط برای کسانی که مجوز manage_admins دارند
+    if admin_system.can_manage_admins(actor_id):
+        buttons.append([InlineKeyboardButton("➕ افزودن ادمین جدید", callback_data="adm_addprompt")])
+
+    buttons.append([InlineKeyboardButton("🔙 بازگشت", callback_data="adm_home")])
+
+    text = "👥 لیست ادمین‌ها\n\nبرای مشاهده جزئیات و تغییر سطح، روی یک ادمین بزنید:"
+    return text, InlineKeyboardMarkup(buttons)
+
+
+def build_admin_detail_view(target_id: int, actor_id: int):
+    """جزئیات یک ادمین + دکمه‌های ارتقا/تنزل/حذف (بر اساس مجوز actor)."""
+    level = admin_system.get_admin_level(target_id)
+
+    if level is None:
+        text = f"کاربر {target_id} ادمین نیست."
+        buttons = [[InlineKeyboardButton("🔙 بازگشت", callback_data="adm_list")]]
+        return text, InlineKeyboardMarkup(buttons)
+
+    level_name = admin_system.LEVEL_NAMES.get(level, "?")
+    text = (
+        f"👤 کاربر: {target_id}\n"
+        f"📊 سطح فعلی: {level_name}\n\n"
+        f"می‌خواهید چه تغییری اعمال شود؟"
+    )
+
+    buttons = []
+
+    can_manage = admin_system.can_manage_admins(actor_id)
+    actor_level = admin_system.get_admin_level(actor_id)
+    is_owner_target = (target_id == admin_system.OWNER_ID)
+
+    if can_manage and not is_owner_target:
+        # دکمه‌های تغییر سطح - فقط سطوحی که actor مجاز به اعطایشان است نشان داده می‌شود
+        level_row = []
+        for lvl in (admin_system.LEVEL_SUPER_OWNER, admin_system.LEVEL_SENIOR_ADMIN,
+                    admin_system.LEVEL_MODERATOR, admin_system.LEVEL_SUPPORT_STAFF):
+            if lvl == level:
+                continue  # سطح فعلی را نشان نده
+            # Owner می‌تواند هر سطحی بدهد؛ بقیه فقط سطح پایین‌تر از خودشان
+            if actor_level != admin_system.LEVEL_SUPER_OWNER and lvl <= actor_level:
+                continue
+            level_row.append(
+                InlineKeyboardButton(
+                    admin_system.LEVEL_NAMES[lvl],
+                    callback_data=f"adm_setlvl_{target_id}_{lvl}",
+                )
+            )
+
+        # دکمه‌ها را دو تا دو تا بچین
+        for i in range(0, len(level_row), 2):
+            buttons.append(level_row[i:i + 2])
+
+        buttons.append([InlineKeyboardButton("🗑 حذف ادمین", callback_data=f"adm_remove_{target_id}")])
+
+    buttons.append([InlineKeyboardButton("🔙 بازگشت به لیست", callback_data="adm_list")])
+
+    return text, InlineKeyboardMarkup(buttons)
+
+
 # ================== BUTTON HANDLER ==================
 
 
@@ -143,7 +263,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_user.id
 
-    if user_id not in ADMIN_IDS:
+    # NEW: علاوه بر ADMIN_IDS قدیمی، ادمین‌های ثبت‌شده در admin_system هم مجاز هستند
+    is_legacy_or_new_admin = user_id in ADMIN_IDS or admin_system.is_admin(user_id)
+
+    if not is_legacy_or_new_admin:
         return
 
     if query.data.startswith("reply_"):
@@ -162,12 +285,81 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"✍️ پاسخ به تیکت #{ticket_id}.",
             reply_markup=feedback_keyboard,
         )
+        return
+
+    # ================== NEW: callback های پنل مدیریت ادمین‌ها ==================
+
+    if query.data == "adm_home":
+        text, markup = build_admin_panel_home(user_id)
+        await query.edit_message_text(text, reply_markup=markup)
+        return
+
+    if query.data == "adm_list":
+        text, markup = build_admin_list_view(user_id)
+        await query.edit_message_text(text, reply_markup=markup)
+        return
+
+    if query.data.startswith("adm_view_"):
+        target_id = int(query.data.replace("adm_view_", ""))
+        text, markup = build_admin_detail_view(target_id, user_id)
+        await query.edit_message_text(text, reply_markup=markup)
+        return
+
+    if query.data.startswith("adm_setlvl_"):
+        # فرمت: adm_setlvl_<target_id>_<level>
+        parts = query.data.replace("adm_setlvl_", "").split("_")
+        target_id, level = int(parts[0]), int(parts[1])
+
+        success, message = admin_system.set_admin_level(
+            target_id=target_id, level=level, actor_id=user_id
+        )
+
+        await query.answer(message, show_alert=True)
+
+        # رفرش صفحه جزئیات همان ادمین تا تغییر را فوری نشان دهد
+        text, markup = build_admin_detail_view(target_id, user_id)
+        await query.edit_message_text(text, reply_markup=markup)
+        return
+
+    if query.data.startswith("adm_remove_"):
+        target_id = int(query.data.replace("adm_remove_", ""))
+
+        success, message = admin_system.remove_admin(target_id=target_id, actor_id=user_id)
+        await query.answer(message, show_alert=True)
+
+        # بعد از حذف، برگرد به لیست
+        text, markup = build_admin_list_view(user_id)
+        await query.edit_message_text(text, reply_markup=markup)
+        return
+
+    if query.data == "adm_addprompt":
+        if not admin_system.can_manage_admins(user_id):
+            await query.answer("❌ شما مجوز افزودن ادمین را ندارید.", show_alert=True)
+            return
+
+        # NEW: کاربر باید یک پیام از فرد موردنظر فوروارد کند یا آیدی عددی را تایپ کند
+        context.user_data["awaiting_new_admin"] = True
+
+        text = (
+            "➕ افزودن ادمین جدید\n\n"
+            "یک پیام از کاربر موردنظر برای من فوروارد کنید،\n"
+            "یا مستقیماً آیدی عددی (User ID) او را ارسال کنید.\n\n"
+            "برای لغو، دکمه زیر را بزنید."
+        )
+        markup = InlineKeyboardMarkup(
+            [[InlineKeyboardButton("❌ لغو", callback_data="adm_list")]]
+        )
+        await query.edit_message_text(text, reply_markup=markup)
+        return
 
 
 # ================== START ==================
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # NEW: ثبت آمار هر بار /start زده می‌شود
+    admin_system.log_usage(update.effective_user.id, "start")
+
     await context.bot.set_chat_menu_button(
         chat_id=update.effective_chat.id,
         menu_button=MenuButtonCommands(),
@@ -195,6 +387,10 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text or ""
 
+    # NEW: ثبت آمار بازدید بخش (فقط برای دکمه‌های شناخته‌شده منو)
+    if text in TRACKED_SECTIONS:
+        admin_system.log_usage(user_id, text)
+
     # ── سلامت ربات ──
     if text == "🔧 سلامت ربات":
         data = await health_check()
@@ -212,6 +408,36 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"❌ Last Error\n{data['error']}"
         )
         await update.message.reply_text(message)
+        return
+
+    # ── NEW: آمار ربات ──
+    if text == "📊 آمار ربات":
+        if not (user_id in ADMIN_IDS or admin_system.has_permission(user_id, "view_stats")):
+            await update.message.reply_text("❌ شما مجوز مشاهده آمار را ندارید.")
+            return
+
+        monthly = admin_system.get_monthly_stats()
+        daily = admin_system.get_daily_stats()
+        total_users = admin_system.get_total_users()
+
+        message = (
+            f"{admin_system.format_stats_message(monthly, 'ماه جاری')}\n\n"
+            f"━━━━━━━━━━━━━━\n\n"
+            f"{admin_system.format_stats_message(daily, 'امروز')}\n\n"
+            f"━━━━━━━━━━━━━━\n\n"
+            f"👤 کل کاربران ربات (تا کنون): {total_users:,}"
+        )
+        await update.message.reply_text(message)
+        return
+
+    # ── NEW: ورود به پنل مدیریت گرافیکی (دکمه‌ای) ──
+    if text == "🛠 پنل مدیریت":
+        if not (user_id in ADMIN_IDS or admin_system.is_admin(user_id)):
+            await update.message.reply_text("❌ شما ادمین نیستید.")
+            return
+
+        text_msg, markup = build_admin_panel_home(user_id)
+        await update.message.reply_text(text_msg, reply_markup=markup)
         return
 
     # ── لغو پاسخ ادمین ──
@@ -283,6 +509,57 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "✅ وارد منو شدی",
             reply_markup=get_markup(user_id),
+        )
+        return
+
+    # ── NEW: دریافت آیدی ادمین جدید (بعد از زدن «➕ افزودن ادمین جدید» در پنل) ──
+    if context.user_data.get("awaiting_new_admin"):
+        if not admin_system.can_manage_admins(user_id):
+            context.user_data["awaiting_new_admin"] = False
+            await update.message.reply_text("❌ شما مجوز افزودن ادمین را ندارید.")
+            return
+
+        target_id = None
+        full_name = ""
+
+        # حالت ۱: کاربر پیام را فوروارد کرده
+        if update.message.forward_from:
+            target_id = update.message.forward_from.id
+            full_name = update.message.forward_from.first_name or ""
+        else:
+            # حالت ۲: کاربر آیدی عددی را تایپ کرده
+            try:
+                target_id = int(text.strip())
+            except (ValueError, AttributeError):
+                await update.message.reply_text(
+                    "❌ ورودی معتبر نیست. یک پیام فوروارد کنید یا آیدی عددی ارسال کنید."
+                )
+                return
+
+        context.user_data["awaiting_new_admin"] = False
+        context.user_data["pending_new_admin_id"] = target_id
+        context.user_data["pending_new_admin_name"] = full_name
+
+        # NEW: بعد از گرفتن آیدی، سطح دسترسی را با دکمه می‌پرسیم
+        actor_level = admin_system.get_admin_level(user_id)
+        level_buttons = []
+        for lvl in (admin_system.LEVEL_SUPER_OWNER, admin_system.LEVEL_SENIOR_ADMIN,
+                    admin_system.LEVEL_MODERATOR, admin_system.LEVEL_SUPPORT_STAFF):
+            if actor_level != admin_system.LEVEL_SUPER_OWNER and lvl <= actor_level:
+                continue
+            level_buttons.append(
+                InlineKeyboardButton(
+                    admin_system.LEVEL_NAMES[lvl],
+                    callback_data=f"adm_setlvl_{target_id}_{lvl}",
+                )
+            )
+
+        rows = [level_buttons[i:i + 2] for i in range(0, len(level_buttons), 2)]
+        rows.append([InlineKeyboardButton("❌ لغو", callback_data="adm_list")])
+
+        await update.message.reply_text(
+            f"کاربر {target_id} پیدا شد.\nسطح دسترسی موردنظر را انتخاب کنید:",
+            reply_markup=InlineKeyboardMarkup(rows),
         )
         return
 

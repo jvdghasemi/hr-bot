@@ -1,0 +1,364 @@
+"""
+admin_system.py
+================
+ماژول مستقل برای:
+  1) آمار ماهانه/روزانه استفاده از ربات (Usage Statistics)
+  2) سیستم مدیریت ادمین‌ها با ۴ سطح دسترسی (Permission Levels)
+
+این نسخه به جای دیتابیس جداگانه، از همان اتصال دیتابیس اصلی ربات (tickets.db)
+استفاده می‌کند تا همه چیز در یک فایل دیتابیس واحد بماند.
+رابط کاربری کاملاً با دکمه‌های شیشه‌ای (InlineKeyboard) است؛ هیچ دستور متنی
+مثل /addadmin لازم نیست — منطق آن در bot.py با callback_data پیاده شده.
+
+سطوح دسترسی (هرچه عدد کمتر، دسترسی بیشتر):
+    1 = Super Owner   (دسترسی کامل - تغییر سطح ادمین‌ها - افزودن/حذف ادمین)
+    2 = Senior Admin   (مدیریت تیکت‌ها - پیام همگانی - مشاهده آمار)
+    3 = Moderator      (پاسخ به تیکت‌ها - مدیریت FAQ)
+    4 = Support Staff  (دسترسی محدود به ابزارهای واگذار شده)
+"""
+
+import os
+import jdatetime
+import pytz
+from datetime import datetime
+
+# ================== تنظیمات سطح دسترسی ==================
+
+LEVEL_SUPER_OWNER = 1
+LEVEL_SENIOR_ADMIN = 2
+LEVEL_MODERATOR = 3
+LEVEL_SUPPORT_STAFF = 4
+
+LEVEL_NAMES = {
+    LEVEL_SUPER_OWNER: "👑 Super Owner",
+    LEVEL_SENIOR_ADMIN: "🥈 Senior Admin",
+    LEVEL_MODERATOR: "🥉 Moderator",
+    LEVEL_SUPPORT_STAFF: "🔹 Support Staff",
+}
+
+LEVEL_PERMISSIONS = {
+    LEVEL_SUPER_OWNER: {
+        "manage_admins", "view_stats", "broadcast",
+        "manage_tickets", "manage_faq", "full_access",
+    },
+    LEVEL_SENIOR_ADMIN: {
+        "view_stats", "broadcast", "manage_tickets",
+    },
+    LEVEL_MODERATOR: {
+        "manage_tickets", "manage_faq",
+    },
+    LEVEL_SUPPORT_STAFF: {
+        "manage_tickets",
+    },
+}
+
+# ================== Owner ID (تنظیم اولیه) ==================
+OWNER_ID_ENV = os.getenv("OWNER_ID")
+OWNER_ID = int(OWNER_ID_ENV) if OWNER_ID_ENV else None
+
+# ================== اتصال دیتابیس مشترک ==================
+# NEW: دیگر دیتابیس جداگانه نمی‌سازیم. این ماژول از همان connection اصلی ربات
+# (tickets.db) استفاده می‌کند که توسط bot.py مقداردهی می‌شود.
+_conn = None
+_cursor = None
+_db_lock = None
+
+
+def bind_connection(conn, cursor, lock):
+    """
+    این تابع باید یک بار از bot.py صدا زده شود تا admin_system از همان
+    اتصال دیتابیس اصلی (tickets.db) و همان db_lock استفاده کند.
+    """
+    global _conn, _cursor, _db_lock
+    _conn = conn
+    _cursor = cursor
+    _db_lock = lock
+    _init_tables()
+
+
+def _init_tables():
+    """
+    ساخت جداول مورد نیاز داخل همان دیتابیس اصلی، در صورت عدم وجود.
+    این تابع امن است و دیتای موجود (تیکت‌ها و ...) را دست نمی‌زند.
+    """
+    _cursor.execute("""
+        CREATE TABLE IF NOT EXISTS admins (
+            user_id INTEGER PRIMARY KEY,
+            level INTEGER NOT NULL,
+            full_name TEXT,
+            added_by INTEGER,
+            added_at TEXT
+        )
+    """)
+
+    _cursor.execute("""
+        CREATE TABLE IF NOT EXISTS usage_logs (
+            log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            action TEXT NOT NULL,
+            date TEXT NOT NULL,
+            month TEXT NOT NULL,
+            timestamp TEXT NOT NULL
+        )
+    """)
+
+    _cursor.execute("""
+        CREATE TABLE IF NOT EXISTS bot_users (
+            user_id INTEGER PRIMARY KEY,
+            first_seen TEXT,
+            last_seen TEXT
+        )
+    """)
+
+    _conn.commit()
+
+
+def _now_tehran():
+    tehran = pytz.timezone("Asia/Tehran")
+    return datetime.now(tehran)
+
+
+def _shamsi_date_and_month(now=None):
+    if now is None:
+        now = _now_tehran()
+    j = jdatetime.datetime.fromgregorian(datetime=now)
+    return j.strftime("%Y/%m/%d"), j.strftime("%Y/%m")
+
+
+# ================== ثبت آمار (Usage Tracking) ==================
+
+def log_usage(user_id: int, action: str):
+    """ثبت یک رویداد استفاده از ربات (start یا باز شدن یک بخش)."""
+    now = _now_tehran()
+    date_str, month_str = _shamsi_date_and_month(now)
+    timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
+
+    with _db_lock:
+        _cursor.execute(
+            "INSERT INTO usage_logs (user_id, action, date, month, timestamp) VALUES (?, ?, ?, ?, ?)",
+            (user_id, action, date_str, month_str, timestamp),
+        )
+
+        _cursor.execute("SELECT user_id FROM bot_users WHERE user_id=?", (user_id,))
+        exists = _cursor.fetchone()
+
+        if exists is None:
+            _cursor.execute(
+                "INSERT INTO bot_users (user_id, first_seen, last_seen) VALUES (?, ?, ?)",
+                (user_id, timestamp, timestamp),
+            )
+        else:
+            _cursor.execute(
+                "UPDATE bot_users SET last_seen=? WHERE user_id=?",
+                (timestamp, user_id),
+            )
+
+        _conn.commit()
+
+
+def get_monthly_stats(month: str = None) -> dict:
+    if month is None:
+        _, month = _shamsi_date_and_month()
+
+    _cursor.execute(
+        "SELECT COUNT(*) FROM usage_logs WHERE action='start' AND month=?", (month,)
+    )
+    total_starts = _cursor.fetchone()[0]
+
+    _cursor.execute(
+        "SELECT COUNT(DISTINCT user_id) FROM usage_logs WHERE month=?", (month,)
+    )
+    unique_users = _cursor.fetchone()[0]
+
+    _cursor.execute(
+        """
+        SELECT action, COUNT(*) as cnt
+        FROM usage_logs
+        WHERE month=? AND action != 'start'
+        GROUP BY action
+        ORDER BY cnt DESC
+        """,
+        (month,),
+    )
+    sections = _cursor.fetchall()
+
+    return {
+        "month": month,
+        "total_starts": total_starts,
+        "unique_users": unique_users,
+        "sections": sections,
+    }
+
+
+def get_daily_stats(date: str = None) -> dict:
+    if date is None:
+        date, _ = _shamsi_date_and_month()
+
+    _cursor.execute(
+        "SELECT COUNT(*) FROM usage_logs WHERE action='start' AND date=?", (date,)
+    )
+    total_starts = _cursor.fetchone()[0]
+
+    _cursor.execute(
+        "SELECT COUNT(DISTINCT user_id) FROM usage_logs WHERE date=?", (date,)
+    )
+    unique_users = _cursor.fetchone()[0]
+
+    _cursor.execute(
+        """
+        SELECT action, COUNT(*) as cnt
+        FROM usage_logs
+        WHERE date=? AND action != 'start'
+        GROUP BY action
+        ORDER BY cnt DESC
+        """,
+        (date,),
+    )
+    sections = _cursor.fetchall()
+
+    return {
+        "date": date,
+        "total_starts": total_starts,
+        "unique_users": unique_users,
+        "sections": sections,
+    }
+
+
+def get_total_users() -> int:
+    _cursor.execute("SELECT COUNT(*) FROM bot_users")
+    return _cursor.fetchone()[0]
+
+
+def format_stats_message(stats: dict, label: str) -> str:
+    lines = [
+        f"📊 آمار {label}",
+        "",
+        f"🚀 تعداد کل /start: {stats['total_starts']:,}",
+        f"👥 کاربران یکتا: {stats['unique_users']:,}",
+        "",
+        "📂 بازدید بخش‌ها:",
+    ]
+
+    if stats["sections"]:
+        for action, count in stats["sections"]:
+            lines.append(f"  • {action}: {count:,}")
+    else:
+        lines.append("  (هنوز داده‌ای ثبت نشده)")
+
+    return "\n".join(lines)
+
+
+# ================== سیستم سطح دسترسی ادمین‌ها ==================
+
+def get_admin_level(user_id: int) -> int | None:
+    """سطح دسترسی کاربر. Owner همیشه سطح ۱. اگر ادمین نباشد None."""
+    if OWNER_ID is not None and user_id == OWNER_ID:
+        return LEVEL_SUPER_OWNER
+
+    _cursor.execute("SELECT level FROM admins WHERE user_id=?", (user_id,))
+    row = _cursor.fetchone()
+    return row[0] if row else None
+
+
+def is_admin(user_id: int) -> bool:
+    return get_admin_level(user_id) is not None
+
+
+def has_permission(user_id: int, permission: str) -> bool:
+    level = get_admin_level(user_id)
+    if level is None:
+        return False
+    if level == LEVEL_SUPER_OWNER:
+        return True
+    return permission in LEVEL_PERMISSIONS.get(level, set())
+
+
+def can_manage_admins(user_id: int) -> bool:
+    """آیا این کاربر اجازه باز کردن پنل مدیریت ادمین‌ها (افزودن/حذف/تغییر سطح) را دارد؟"""
+    level = get_admin_level(user_id)
+    if level is None:
+        return False
+    if level == LEVEL_SUPER_OWNER:
+        return True
+    return "manage_admins" in LEVEL_PERMISSIONS.get(level, set())
+
+
+def set_admin_level(target_id: int, level: int, actor_id: int, full_name: str = "") -> tuple[bool, str]:
+    """
+    تنظیم سطح دسترسی یک کاربر (افزودن ادمین جدید یا ارتقا/تنزل ادمین موجود).
+    قوانین سلسله‌مراتبی:
+      - actor باید مجوز manage_admins داشته باشد.
+      - actor نمی‌تواند سطحی بالاتر یا برابر خودش به کسی بدهد (مگر خودش Owner باشد).
+      - actor نمی‌تواند روی ادمینی که از خودش سطح بالاتر دارد تغییر اعمال کند.
+      - Owner قابل تغییر توسط غیر-Owner نیست.
+    """
+    actor_level = get_admin_level(actor_id)
+
+    if actor_level is None or not can_manage_admins(actor_id):
+        return False, "❌ شما مجوز مدیریت ادمین‌ها را ندارید."
+
+    if target_id == OWNER_ID and actor_id != OWNER_ID:
+        return False, "❌ امکان تغییر سطح Super Owner وجود ندارد."
+
+    if actor_level != LEVEL_SUPER_OWNER and level <= actor_level:
+        return False, "❌ شما نمی‌توانید سطحی برابر یا بالاتر از خودتان اعطا کنید."
+
+    existing_level = get_admin_level(target_id)
+    if existing_level is not None and actor_level != LEVEL_SUPER_OWNER and existing_level < actor_level:
+        return False, "❌ شما نمی‌توانید سطح این ادمین را تغییر دهید (سطح بالاتر دارد)."
+
+    now = _now_tehran().strftime("%Y-%m-%d %H:%M:%S")
+
+    with _db_lock:
+        if existing_level is not None:
+            _cursor.execute(
+                "UPDATE admins SET level=? WHERE user_id=?", (level, target_id)
+            )
+        else:
+            _cursor.execute(
+                "INSERT INTO admins (user_id, level, full_name, added_by, added_at) VALUES (?, ?, ?, ?, ?)",
+                (target_id, level, full_name, actor_id, now),
+            )
+        _conn.commit()
+
+    return True, f"✅ سطح کاربر {target_id} روی «{LEVEL_NAMES[level]}» تنظیم شد."
+
+
+def remove_admin(target_id: int, actor_id: int) -> tuple[bool, str]:
+    actor_level = get_admin_level(actor_id)
+
+    if actor_level is None or not can_manage_admins(actor_id):
+        return False, "❌ شما مجوز مدیریت ادمین‌ها را ندارید."
+
+    if target_id == OWNER_ID:
+        return False, "❌ امکان حذف Super Owner وجود ندارد."
+
+    target_level = get_admin_level(target_id)
+    if target_level is None:
+        return False, "❌ این کاربر ادمین نیست."
+
+    if actor_level != LEVEL_SUPER_OWNER and target_level < actor_level:
+        return False, "❌ شما نمی‌توانید ادمینی با سطح بالاتر از خودتان را حذف کنید."
+
+    with _db_lock:
+        _cursor.execute("DELETE FROM admins WHERE user_id=?", (target_id,))
+        _conn.commit()
+
+    return True, f"✅ ادمین {target_id} حذف شد."
+
+
+def list_admins() -> list[tuple]:
+    """لیست همه ادمین‌ها: [(user_id, level, full_name), ...] — به‌علاوه Owner از env (اگر در جدول نباشد)."""
+    _cursor.execute("SELECT user_id, level, full_name FROM admins ORDER BY level ASC, user_id ASC")
+    rows = list(_cursor.fetchall())
+
+    if OWNER_ID is not None and not any(r[0] == OWNER_ID for r in rows):
+        rows.insert(0, (OWNER_ID, LEVEL_SUPER_OWNER, "Owner (env)"))
+
+    return rows
+
+
+def get_admin_display_name(user_id: int, full_name: str = "") -> str:
+    if full_name:
+        return f"{full_name} ({user_id})"
+    return str(user_id)
