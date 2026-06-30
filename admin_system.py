@@ -11,16 +11,22 @@ admin_system.py
 مثل /addadmin لازم نیست — منطق آن در bot.py با callback_data پیاده شده.
 
 سطوح دسترسی (هرچه عدد کمتر، دسترسی بیشتر):
-    1 = Super Owner   (دسترسی کامل - تغییر سطح ادمین‌ها - افزودن/حذف ادمین)
-    2 = Senior Admin   (مدیریت تیکت‌ها - پیام همگانی - مشاهده آمار)
-    3 = Moderator      (پاسخ به تیکت‌ها - مدیریت FAQ)
-    4 = Support Staff  (دسترسی محدود به ابزارهای واگذار شده)
+    1 = Super Owner / Owner   (دسترسی کامل - تغییر سطح ادمین‌ها - افزودن/حذف ادمین - انتقال مالکیت)
+    2 = Senior Admin          (مدیریت تیکت‌ها - پیام همگانی - مشاهده آمار)
+    3 = Moderator             (پاسخ به تیکت‌ها - مدیریت FAQ)
+    4 = Support Staff         (دسترسی محدود به ابزارهای واگذار شده)
+
+NEW (نسخه ۲): این ماژول دیگر دیتابیس را خودش باز نمی‌کند. اتصال از طریق
+database.get_bot_db() گرفته می‌شود تا تمام داده‌های مدیریتی/آماری در
+bot.db نگهداری شوند و هرگز با tickets.db (که فقط مخصوص تیکت‌هاست) قاطی نشوند.
 """
 
 import os
 import jdatetime
 import pytz
 from datetime import datetime
+
+import database
 
 # ================== تنظیمات سطح دسترسی ==================
 
@@ -57,23 +63,26 @@ OWNER_ID_ENV = os.getenv("OWNER_ID")
 OWNER_ID = int(OWNER_ID_ENV) if OWNER_ID_ENV else None
 
 # ================== اتصال دیتابیس مشترک ==================
-# NEW: دیگر دیتابیس جداگانه نمی‌سازیم. این ماژول از همان connection اصلی ربات
-# (tickets.db) استفاده می‌کند که توسط bot.py مقداردهی می‌شود.
-_conn = None
-_cursor = None
-_db_lock = None
+# NEW (v2): این ماژول از دیتابیس مستقل bot.db استفاده می‌کند (نه tickets.db)
+# تا داده‌های ادمین/آمار هرگز با داده‌های تیکت مخلوط نشوند.
+# اتصال به‌صورت خودکار از database.py گرفته می‌شود؛ نیازی به فراخوانی دستی
+# نیست، اما bind_connection() برای سازگاری با نسخه‌های قبلی نگه داشته شده است.
+
+_conn, _cursor, _db_lock = database.get_bot_db()
 
 
-def bind_connection(conn, cursor, lock):
+def bind_connection(conn=None, cursor=None, lock=None):
     """
-    این تابع باید یک بار از bot.py صدا زده شود تا admin_system از همان
-    اتصال دیتابیس اصلی (tickets.db) و همان db_lock استفاده کند.
+    DEPRECATED (نگه‌داشته‌شده برای سازگاری عقب‌رو): دیگر لازم نیست از bot.py
+    صدا زده شود؛ admin_system به‌صورت خودکار به bot.db متصل می‌شود.
+    آرگومان‌ها نادیده گرفته می‌شوند؛ فقط جداول bot.db مطمئن می‌شوند ساخته شده‌اند
+    و در صورت وجود جداول قدیمی داخل tickets.db، داده‌هایشان منتقل می‌شود.
     """
-    global _conn, _cursor, _db_lock
-    _conn = conn
-    _cursor = cursor
-    _db_lock = lock
     _init_tables()
+    try:
+        database.migrate_legacy_admin_tables()
+    except Exception:
+        pass
 
 
 def _init_tables():
@@ -111,6 +120,14 @@ def _init_tables():
     """)
 
     _conn.commit()
+
+
+# اطمینان از وجود جداول در همان لحظه import شدن ماژول
+_init_tables()
+try:
+    database.migrate_legacy_admin_tables()
+except Exception:
+    pass
 
 
 def _now_tehran():
@@ -362,3 +379,139 @@ def get_admin_display_name(user_id: int, full_name: str = "") -> str:
     if full_name:
         return f"{full_name} ({user_id})"
     return str(user_id)
+
+
+# ================== NEW: انتقال مالکیت (Transfer Ownership) ==================
+
+def transfer_ownership(new_owner_id: int, actor_id: int) -> tuple[bool, str]:
+    """
+    فقط Owner فعلی می‌تواند مالکیت را به ادمین دیگری منتقل کند.
+    مالک قبلی به‌صورت خودکار به سطح Senior Admin تنزل پیدا می‌کند تا دسترسی
+    کامل به سیستم را روی خودش نگه ندارد و سیستم تک-Owner باقی بماند.
+    توجه: OWNER_ID از متغیر محیطی خوانده می‌شود، بنابراین این تابع تغییر را
+    در جدول admins ثبت می‌کند؛ برای کامل شدن انتقال در همه‌ی ری‌استارت‌ها،
+    متغیر محیطی OWNER_ID باید توسط مسئول دیپلوی به‌روزرسانی شود (در پیام به
+    actor توضیح داده می‌شود).
+    """
+    global OWNER_ID
+
+    if actor_id != OWNER_ID:
+        return False, "❌ فقط مالک فعلی (Owner) می‌تواند مالکیت را منتقل کند."
+
+    if new_owner_id == OWNER_ID:
+        return False, "❌ این کاربر همین حالا هم Owner است."
+
+    now = _now_tehran().strftime("%Y-%m-%d %H:%M:%S")
+    old_owner_id = OWNER_ID
+
+    with _db_lock:
+        # ادمین جدید را به‌عنوان Super Owner ثبت/به‌روزرسانی کن
+        _cursor.execute("SELECT user_id FROM admins WHERE user_id=?", (new_owner_id,))
+        if _cursor.fetchone() is None:
+            _cursor.execute(
+                "INSERT INTO admins (user_id, level, full_name, added_by, added_at) VALUES (?, ?, ?, ?, ?)",
+                (new_owner_id, LEVEL_SUPER_OWNER, "", actor_id, now),
+            )
+        else:
+            _cursor.execute(
+                "UPDATE admins SET level=? WHERE user_id=?", (LEVEL_SUPER_OWNER, new_owner_id)
+            )
+
+        # مالک قبلی به Senior Admin تنزل پیدا می‌کند (نه حذف کامل دسترسی)
+        _cursor.execute("SELECT user_id FROM admins WHERE user_id=?", (old_owner_id,))
+        if _cursor.fetchone() is None:
+            _cursor.execute(
+                "INSERT INTO admins (user_id, level, full_name, added_by, added_at) VALUES (?, ?, ?, ?, ?)",
+                (old_owner_id, LEVEL_SENIOR_ADMIN, "", actor_id, now),
+            )
+        else:
+            _cursor.execute(
+                "UPDATE admins SET level=? WHERE user_id=?", (LEVEL_SENIOR_ADMIN, old_owner_id)
+            )
+
+        _conn.commit()
+
+    # به‌روزرسانی درون‌حافظه‌ای برای همین اجرای ربات (تا ری‌استارت بعدی که OWNER_ID
+    # باید از طریق متغیر محیطی هم تغییر کند تا دائمی بماند)
+    OWNER_ID = new_owner_id
+
+    return True, (
+        f"✅ مالکیت با موفقیت به کاربر {new_owner_id} منتقل شد.\n"
+        f"⚠️ توجه: برای دائمی شدن این تغییر پس از ری‌استارت ربات، متغیر محیطی "
+        f"OWNER_ID باید روی {new_owner_id} تنظیم شود."
+    )
+
+
+# ================== NEW: آمار کلی/Lifetime + داشبورد آمار ==================
+
+def get_lifetime_stats() -> dict:
+    """آمار کل (از ابتدای راه‌اندازی ربات تا کنون) — مستقیماً از usage_logs محاسبه می‌شود."""
+    _cursor.execute("SELECT COUNT(*) FROM usage_logs WHERE action='start'")
+    total_starts = _cursor.fetchone()[0]
+
+    _cursor.execute("SELECT COUNT(DISTINCT user_id) FROM usage_logs")
+    unique_users = _cursor.fetchone()[0]
+
+    _cursor.execute("SELECT COUNT(*) FROM usage_logs")
+    total_events = _cursor.fetchone()[0]
+
+    return {
+        "total_starts": total_starts,
+        "unique_users": unique_users,
+        "total_events": total_events,
+    }
+
+
+def get_most_used_sections(limit: int = 10) -> list[tuple]:
+    """پربازدیدترین بخش‌های ربات در کل تاریخچه (به‌جز رویداد start)."""
+    _cursor.execute(
+        """
+        SELECT action, COUNT(*) as cnt
+        FROM usage_logs
+        WHERE action != 'start'
+        GROUP BY action
+        ORDER BY cnt DESC
+        LIMIT ?
+        """,
+        (limit,),
+    )
+    return _cursor.fetchall()
+
+
+def build_dashboard_text() -> str:
+    """
+    متن کامل «📊 Bot Usage Dashboard» مطابق درخواست:
+    Total Starts, Unique Users, Monthly Usage, Daily Usage, Most used sections.
+    این تابع فقط باید برای ادمین‌ها (view_stats) نمایش داده شود.
+    """
+    lifetime = get_lifetime_stats()
+    monthly = get_monthly_stats()
+    daily = get_daily_stats()
+    total_users = get_total_users()
+    top_sections = get_most_used_sections(10)
+
+    lines = [
+        "📊 Bot Usage Dashboard",
+        "",
+        f"🚀 Total Starts (Lifetime): {lifetime['total_starts']:,}",
+        f"👥 Unique Users (Lifetime): {lifetime['unique_users']:,}",
+        f"👤 Total Registered Users: {total_users:,}",
+        "",
+        f"📆 Monthly Usage ({monthly['month']}):",
+        f"   • Starts: {monthly['total_starts']:,}",
+        f"   • Unique Users: {monthly['unique_users']:,}",
+        "",
+        f"📅 Daily Usage ({daily['date']}):",
+        f"   • Starts: {daily['total_starts']:,}",
+        f"   • Unique Users: {daily['unique_users']:,}",
+        "",
+        "📂 Most Used Sections (Lifetime):",
+    ]
+
+    if top_sections:
+        for action, count in top_sections:
+            lines.append(f"   • {action}: {count:,}")
+    else:
+        lines.append("   (هنوز داده‌ای ثبت نشده)")
+
+    return "\n".join(lines)

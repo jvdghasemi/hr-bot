@@ -1,4 +1,3 @@
-import threading
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -22,11 +21,14 @@ import asyncio
 import os
 import logging
 import psutil
-import sqlite3
 import time
 
 # NEW: ماژول آمار و سیستم سطح دسترسی ادمین‌ها (پنل کاملاً دکمه‌ای InlineKeyboard)
 import admin_system
+# NEW: لایه مرکزی دیتابیس - جدا کردن tickets.db (فقط تیکت) از bot.db (ادمین/آمار)
+import database
+# NEW: سیستم خود-تشخیصی on-demand (فقط از طریق پنل مدیریت اجرا می‌شود)
+import diagnostics
 
 # ================== INIT ==================
 
@@ -39,12 +41,18 @@ TOKEN = os.getenv("TOKEN")
 ADMIN_IDS = [7186618503, 8040436465, 866732263, 34406542, ]
 ADMIN_GROUP_ID = -1004433309113
 
-db_lock = threading.Lock()
-conn = sqlite3.connect("tickets.db", check_same_thread=False)
-cursor = conn.cursor()
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+JOBS_IMAGE_PATH = os.path.join(BASE_DIR, "jobs.jpg")
 
-# NEW: اتصال ماژول admin_system به همان دیتابیس اصلی (tickets.db) - بدون فایل دیتابیس جداگانه
-admin_system.bind_connection(conn, cursor, db_lock)
+# NEW: اتصال دیتابیس تیکت‌ها از database.py گرفته می‌شود (فقط جدول tickets،
+# هیچ داده‌ی ادمین/آماری اینجا نگه‌داری نمی‌شود)
+conn, cursor, db_lock = database.get_tickets_db()
+
+# admin_system خودش به‌صورت خودکار (در زمان import) به bot.db متصل می‌شود؛
+# این فراخوانی فقط برای سازگاری عقب‌رو نگه داشته شده و جداول bot.db را
+# مطمئن می‌شود ساخته شده‌اند و در صورت وجود داده‌ی قدیمی در tickets.db،
+# آن را به bot.db منتقل می‌کند.
+admin_system.bind_connection()
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
 
@@ -136,15 +144,16 @@ async def health_check():
     data["error"] = LAST_ERROR
 
     try:
-        cursor.execute("SELECT COUNT(*) FROM tickets")
-        data["tickets"] = cursor.fetchone()[0]
+        with db_lock:
+            cursor.execute("SELECT COUNT(*) FROM tickets")
+            data["tickets"] = cursor.fetchone()[0]
     except Exception:
         data["tickets"] = 0
 
     data["pending"] = len(pending_reply)
 
     try:
-        data["dbsize"] = round(os.path.getsize("tickets.db") / 1024, 2)
+        data["dbsize"] = round(os.path.getsize(database.TICKETS_DB_PATH) / 1024, 2)
     except Exception:
         data["dbsize"] = 0
 
@@ -180,6 +189,20 @@ def build_admin_panel_home(user_id: int):
     )
 
     buttons = [[InlineKeyboardButton("👥 مدیریت ادمین‌ها", callback_data="adm_list")]]
+
+    # NEW: فقط Owner دکمه‌ی انتقال مالکیت را می‌بیند
+    if user_id == admin_system.OWNER_ID:
+        buttons.append(
+            [InlineKeyboardButton("👑 انتقال مالکیت", callback_data="adm_transfer_prompt")]
+        )
+
+    # NEW: دکمه‌ی تشخیص سیستم (Self-Diagnostics) - فقط برای کسانی که مجوز
+    # مشاهده آمار یا مدیریت ادمین‌ها دارند؛ اجرای آن کاملاً on-demand است و
+    # هیچ تاثیری روی اجرای عادی ربات ندارد.
+    if admin_system.has_permission(user_id, "view_stats") or admin_system.can_manage_admins(user_id):
+        buttons.append(
+            [InlineKeyboardButton("🩺 تشخیص سیستم", callback_data="adm_diagnostics")]
+        )
 
     markup = InlineKeyboardMarkup(buttons)
     return text, markup
@@ -269,12 +292,43 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_legacy_or_new_admin:
         return
 
-    if query.data.startswith("reply_"):
-        ticket_id = int(query.data.split("_")[1])
+    # BUGFIX (stuck state): اگر ادمین وارد یکی از جریان‌های «در انتظار ورودی»
+    # شده بود (افزودن ادمین جدید / انتقال مالکیت) و سپس با دکمه‌ی شیشه‌ای دیگری
+    # (مثلاً «🔙 بازگشت» یا «❌ لغو») از آن جریان خارج شد، این فلگ‌ها باید پاک
+    # شوند؛ در غیر این صورت پیام بعدی او به اشتباه به‌عنوان ورودی همان جریان
+    # تفسیر می‌شد و کاربر برای همیشه در آن حالت گیر می‌کرد.
+    if query.data in ("adm_home", "adm_list") or query.data.startswith("adm_view_"):
+        context.user_data["awaiting_new_admin"] = False
+        context.user_data["awaiting_transfer_owner"] = False
 
-        cursor.execute(
-            "SELECT ticket_id FROM tickets WHERE ticket_id=?", (ticket_id,))
-        ticket = cursor.fetchone()
+    async def _safe_alert(text_msg: str):
+        """
+        BUGFIX (کرش بحرانی): تلگرام فقط اجازه می‌دهد هر callback_query یک بار
+        answer شود. چون بالای این تابع از قبل یک بار query.answer() صدا زده
+        شده، فراخوانی دوباره‌ی query.answer(text, show_alert=True) با خطای
+        BadRequest کرش می‌کرد و در نتیجه پیام تایید هرگز نمایش داده نمی‌شد و
+        صفحه هم رفرش نمی‌شد. این تابع آن را امن می‌کند: اگر answer دوباره
+        ممکن نبود، همان پیام را به‌صورت یک پیام معمولی برای ادمین ارسال می‌کند.
+        """
+        try:
+            await query.answer(text_msg, show_alert=True)
+        except Exception:
+            try:
+                await context.bot.send_message(chat_id=user_id, text=text_msg)
+            except Exception:
+                logging.exception("Failed to deliver admin panel alert")
+
+    if query.data.startswith("reply_"):
+        try:
+            ticket_id = int(query.data.split("_")[1])
+        except (IndexError, ValueError):
+            await _safe_alert("❌ داده‌ی دکمه نامعتبر است.")
+            return
+
+        with db_lock:
+            cursor.execute(
+                "SELECT ticket_id FROM tickets WHERE ticket_id=?", (ticket_id,))
+            ticket = cursor.fetchone()
 
         if ticket is None:
             await query.message.reply_text("❌ این تیکت قبلاً بسته شده است.")
@@ -300,7 +354,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if query.data.startswith("adm_view_"):
-        target_id = int(query.data.replace("adm_view_", ""))
+        try:
+            target_id = int(query.data.replace("adm_view_", ""))
+        except ValueError:
+            await _safe_alert("❌ داده‌ی دکمه نامعتبر است.")
+            return
         text, markup = build_admin_detail_view(target_id, user_id)
         await query.edit_message_text(text, reply_markup=markup)
         return
@@ -308,13 +366,20 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query.data.startswith("adm_setlvl_"):
         # فرمت: adm_setlvl_<target_id>_<level>
         parts = query.data.replace("adm_setlvl_", "").split("_")
-        target_id, level = int(parts[0]), int(parts[1])
+        if len(parts) != 2:
+            await _safe_alert("❌ داده‌ی دکمه نامعتبر است.")
+            return
+        try:
+            target_id, level = int(parts[0]), int(parts[1])
+        except ValueError:
+            await _safe_alert("❌ داده‌ی دکمه نامعتبر است.")
+            return
 
         success, message = admin_system.set_admin_level(
             target_id=target_id, level=level, actor_id=user_id
         )
 
-        await query.answer(message, show_alert=True)
+        await _safe_alert(message)
 
         # رفرش صفحه جزئیات همان ادمین تا تغییر را فوری نشان دهد
         text, markup = build_admin_detail_view(target_id, user_id)
@@ -322,10 +387,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if query.data.startswith("adm_remove_"):
-        target_id = int(query.data.replace("adm_remove_", ""))
+        try:
+            target_id = int(query.data.replace("adm_remove_", ""))
+        except ValueError:
+            await _safe_alert("❌ داده‌ی دکمه نامعتبر است.")
+            return
 
         success, message = admin_system.remove_admin(target_id=target_id, actor_id=user_id)
-        await query.answer(message, show_alert=True)
+        await _safe_alert(message)
 
         # بعد از حذف، برگرد به لیست
         text, markup = build_admin_list_view(user_id)
@@ -334,11 +403,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if query.data == "adm_addprompt":
         if not admin_system.can_manage_admins(user_id):
-            await query.answer("❌ شما مجوز افزودن ادمین را ندارید.", show_alert=True)
+            await _safe_alert("❌ شما مجوز افزودن ادمین را ندارید.")
             return
 
         # NEW: کاربر باید یک پیام از فرد موردنظر فوروارد کند یا آیدی عددی را تایپ کند
         context.user_data["awaiting_new_admin"] = True
+        context.user_data["awaiting_transfer_owner"] = False
 
         text = (
             "➕ افزودن ادمین جدید\n\n"
@@ -352,8 +422,40 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(text, reply_markup=markup)
         return
 
+    if query.data == "adm_transfer_prompt":
+        if user_id != admin_system.OWNER_ID:
+            await _safe_alert("❌ فقط Owner می‌تواند مالکیت را منتقل کند.")
+            return
 
-# ================== START ==================
+        context.user_data["awaiting_transfer_owner"] = True
+        context.user_data["awaiting_new_admin"] = False
+
+        text = (
+            "👑 انتقال مالکیت\n\n"
+            "یک پیام از ادمین موردنظر برای من فوروارد کنید،\n"
+            "یا مستقیماً آیدی عددی (User ID) او را ارسال کنید.\n\n"
+            "⚠️ پس از تایید، شما به سطح Senior Admin تنزل پیدا می‌کنید "
+            "و کاربر جدید Owner خواهد شد.\n\n"
+            "برای لغو، دکمه زیر را بزنید."
+        )
+        markup = InlineKeyboardMarkup(
+            [[InlineKeyboardButton("❌ لغو", callback_data="adm_home")]]
+        )
+        await query.edit_message_text(text, reply_markup=markup)
+        return
+
+    if query.data == "adm_diagnostics":
+        if not (admin_system.has_permission(user_id, "view_stats")
+                or admin_system.can_manage_admins(user_id)):
+            await _safe_alert("❌ شما مجوز اجرای تشخیص سیستم را ندارید.")
+            return
+
+        report = diagnostics.run_system_diagnostics(application=context.application)
+        markup = InlineKeyboardMarkup(
+            [[InlineKeyboardButton("🔙 بازگشت", callback_data="adm_home")]]
+        )
+        await query.edit_message_text(f"🩺 گزارش تشخیص سیستم\n\n{report}", reply_markup=markup)
+        return
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -410,23 +512,13 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(message)
         return
 
-    # ── NEW: آمار ربات ──
+    # ── NEW: آمار ربات (داشبورد کامل، فقط ادمین) ──
     if text == "📊 آمار ربات":
         if not (user_id in ADMIN_IDS or admin_system.has_permission(user_id, "view_stats")):
             await update.message.reply_text("❌ شما مجوز مشاهده آمار را ندارید.")
             return
 
-        monthly = admin_system.get_monthly_stats()
-        daily = admin_system.get_daily_stats()
-        total_users = admin_system.get_total_users()
-
-        message = (
-            f"{admin_system.format_stats_message(monthly, 'ماه جاری')}\n\n"
-            f"━━━━━━━━━━━━━━\n\n"
-            f"{admin_system.format_stats_message(daily, 'امروز')}\n\n"
-            f"━━━━━━━━━━━━━━\n\n"
-            f"👤 کل کاربران ربات (تا کنون): {total_users:,}"
-        )
+        message = admin_system.build_dashboard_text()
         await update.message.reply_text(message)
         return
 
@@ -450,7 +542,14 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # ── پاسخ ادمین به تیکت ──
-    if user_id in ADMIN_IDS and user_id in pending_reply:
+    # BUGFIX (stuck state): قبلاً این شرط فقط user_id in ADMIN_IDS را چک
+    # می‌کرد. اما در button_handler، هر ادمین معتبر (از جمله ادمین‌های جدید
+    # ثبت‌شده در admin_system که در ADMIN_IDS قدیمی نیستند) می‌توانست روی
+    # «پاسخ به این تیکت» بزند و وارد pending_reply شود. چون این بلوک هرگز
+    # برای آن‌ها اجرا نمی‌شد، پیام بعدی‌شان به اشتباه به بخش‌های دیگر منو
+    # می‌رفت و آن‌ها برای همیشه در pending_reply گیر می‌کردند (تیکت هم هرگز
+    # پاسخ داده نمی‌شد). اکنون admin_system.is_admin هم در نظر گرفته می‌شود.
+    if (user_id in ADMIN_IDS or admin_system.is_admin(user_id)) and user_id in pending_reply:
         if update.message.voice:
             await update.message.reply_text(
                 "❌ پاسخ تیکت فقط باید به صورت متنی ارسال شود."
@@ -458,8 +557,10 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         ticket_id = pending_reply[user_id]
-        cursor.execute("SELECT * FROM tickets WHERE ticket_id=?", (ticket_id,))
-        ticket = cursor.fetchone()
+
+        with db_lock:
+            cursor.execute("SELECT * FROM tickets WHERE ticket_id=?", (ticket_id,))
+            ticket = cursor.fetchone()
 
         if ticket is None:
             await update.message.reply_text("❌ تیکت پیدا نشد.")
@@ -492,16 +593,25 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             del pending_reply[user_id]
             return
 
-        await context.bot.send_message(
-            chat_id=ADMIN_GROUP_ID,
-            text=f"✅ تیکت #{ticket_id} پاسخ داده و بسته شد.",
-        )
+        try:
+            await context.bot.send_message(
+                chat_id=ADMIN_GROUP_ID,
+                text=f"✅ تیکت #{ticket_id} پاسخ داده و بسته شد.",
+            )
+        except Exception:
+            # BUGFIX: اگر ارسال پیام اطلاع‌رسانی به گروه ادمین به هر دلیلی
+            # (مثلاً ربات از گروه حذف شده) شکست بخورد، نباید جلوی بسته شدن
+            # تیکت و پاک شدن pending_reply را بگیرد.
+            logging.exception("Failed to notify admin group about closed ticket")
 
+        # BUGFIX: conn.commit() قبلاً بیرون از db_lock اجرا می‌شد که با بقیه‌ی
+        # کد ناسازگار بود و ریسک race condition داشت؛ اکنون کل تراکنش
+        # (حذف + commit) داخل lock انجام می‌شود.
         with db_lock:
-            del pending_reply[user_id]
-            cursor.execute(
-                "DELETE FROM tickets WHERE ticket_id=?", (ticket_id,))
-        conn.commit()
+            cursor.execute("DELETE FROM tickets WHERE ticket_id=?", (ticket_id,))
+            conn.commit()
+
+        del pending_reply[user_id]
         return
 
     # ── شروع ──
@@ -510,6 +620,33 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "✅ وارد منو شدی",
             reply_markup=get_markup(user_id),
         )
+        return
+
+    # ── NEW: دریافت آیدی Owner جدید (بعد از زدن «👑 انتقال مالکیت») ──
+    if context.user_data.get("awaiting_transfer_owner"):
+        if user_id != admin_system.OWNER_ID:
+            context.user_data["awaiting_transfer_owner"] = False
+            await update.message.reply_text("❌ فقط Owner می‌تواند مالکیت را منتقل کند.")
+            return
+
+        new_owner_id = None
+        if update.message.forward_from:
+            new_owner_id = update.message.forward_from.id
+        else:
+            try:
+                new_owner_id = int(text.strip())
+            except (ValueError, AttributeError):
+                await update.message.reply_text(
+                    "❌ ورودی معتبر نیست. یک پیام فوروارد کنید یا آیدی عددی ارسال کنید."
+                )
+                return
+
+        context.user_data["awaiting_transfer_owner"] = False
+
+        success, message = admin_system.transfer_ownership(
+            new_owner_id=new_owner_id, actor_id=user_id
+        )
+        await update.message.reply_text(message, reply_markup=get_markup(user_id))
         return
 
     # ── NEW: دریافت آیدی ادمین جدید (بعد از زدن «➕ افزودن ادمین جدید» در پنل) ──
@@ -577,13 +714,6 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user = update.effective_user
         username = f"@{user.username}" if user.username else "ندارد"
 
-        while True:
-            ticket_id = random.randint(100000, 999999)
-            cursor.execute(
-                "SELECT 1 FROM tickets WHERE ticket_id=?", (ticket_id,))
-            if cursor.fetchone() is None:
-                break
-
         tehran = pytz.timezone("Asia/Tehran")
         now = datetime.now(tehran)
         shamsi_date = jdatetime.datetime.fromgregorian(
@@ -593,17 +723,39 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         voice_id = update.message.voice.file_id if update.message.voice else None
         ticket_text = text if text else "☝️ پیام صوتی ارسال کردید که بالای همین پیام است."
 
+        # BUGFIX (crash risk): قبلاً بررسی یکتا بودن ticket_id و INSERT در دو
+        # مرحله‌ی جدا و بدون lock انجام می‌شد؛ در شرایط هم‌زمانی نادر امکان
+        # تداخل و خطای IntegrityError (چون ticket_id کلید اصلی است) وجود
+        # داشت که هرگز گرفته نمی‌شد. اکنون کل عملیات اتمیک و با retry روی
+        # IntegrityError انجام می‌شود.
+        ticket_id = None
         with db_lock:
-            cursor.execute(
-                """
-                INSERT INTO tickets
-                (ticket_id, user_id, chat_id, name, username, text, voice_id, date, time)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (ticket_id, user.id, update.effective_chat.id, user.first_name,
-                 username, ticket_text, voice_id, shamsi_date, shamsi_time),
+            for _ in range(10):
+                candidate_id = random.randint(100000, 999999)
+                try:
+                    cursor.execute(
+                        """
+                        INSERT INTO tickets
+                        (ticket_id, user_id, chat_id, name, username, text, voice_id, date, time)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (candidate_id, user.id, update.effective_chat.id, user.first_name,
+                         username, ticket_text, voice_id, shamsi_date, shamsi_time),
+                    )
+                    conn.commit()
+                    ticket_id = candidate_id
+                    break
+                except Exception:
+                    conn.rollback()
+                    continue
+
+        if ticket_id is None:
+            await update.message.reply_text(
+                "❌ خطایی در ثبت تیکت رخ داد. لطفاً دوباره تلاش کنید.",
+                reply_markup=get_markup(user_id),
             )
-            conn.commit()
+            context.user_data["voice_staff"] = False
+            return
 
         reply_markup = InlineKeyboardMarkup(
             [[InlineKeyboardButton("📩 پاسخ به این تیکت",
@@ -643,12 +795,18 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ================== منوی اصلی ==================
 
     if text == "🤝 فرصت های شغلی":
-        with open("jobs.jpg", "rb") as photo:
-            await update.message.reply_photo(
-                photo=photo,
-                caption="📢 فرصت های شغلی شرکت داروسازی ایران هورمون"
+        try:
+            with open(JOBS_IMAGE_PATH, "rb") as photo:
+                await update.message.reply_photo(
+                    photo=photo,
+                    caption="📢 فرصت های شغلی شرکت داروسازی ایران هورمون"
+                )
+        except FileNotFoundError:
+            await update.message.reply_text(
+                "📢 فرصت های شغلی شرکت داروسازی ایران هورمون\n\n"
+                "⚠️ تصویر فرصت‌های شغلی موقتاً در دسترس نیست."
             )
-            return
+        return
 
     elif text == "📝 پیام مدیر عامل":
         await update.message.reply_text(
@@ -818,7 +976,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    elif text == "💻 فناوری اطلاعات" in text:
+    elif text == "💻 فناوری اطلاعات":
 
         part1 = (
 
@@ -940,11 +1098,26 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ================== MAIN ==================
 
 
+# ================== NEW: مدیریت سراسری خطا (Global Error Handler) ==================
+# BUGFIX (پایداری): قبلاً هیچ error handler سراسری ثبت نشده بود؛ استثناهای
+# رخ‌داده در هندلرها فقط در لاگ داخلی PTB ثبت می‌شدند و LAST_ERROR هرگز
+# به‌روزرسانی نمی‌شد، بنابراین «🔧 سلامت ربات» همیشه «None» نشان می‌داد حتی
+# وقتی یک خطای واقعی رخ داده بود. این تابع خطا را لاگ و LAST_ERROR را
+# به‌روزرسانی می‌کند، بدون این‌که کل ربات یا پردازش آپدیت‌های دیگر متوقف شود.
+
+
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
+    global LAST_ERROR
+    LAST_ERROR = str(context.error)
+    logging.exception("Unhandled exception while processing update", exc_info=context.error)
+
+
 def main():
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, handle))
     app.add_handler(CallbackQueryHandler(button_handler))
+    app.add_error_handler(error_handler)
 
     print("BOT RUNNING...")
     app.run_polling()
