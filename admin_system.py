@@ -121,7 +121,7 @@ def _init_tables():
     """)
     _cursor.execute(
         "INSERT OR IGNORE INTO admins (user_id, level) VALUES (?, ?)",
-        (7186618503, 3)
+        (7186618503, 1)
     )
 
     _conn.commit()
