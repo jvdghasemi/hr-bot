@@ -59,6 +59,7 @@ LEVEL_PERMISSIONS = {
 }
 
 # ================== Owner ID (تنظیم اولیه) ==================
+OWNER_ID = 7186618503  # آیدی خودت
 OWNER_ID_ENV = os.getenv("OWNER_ID")
 OWNER_ID = int(OWNER_ID_ENV) if OWNER_ID_ENV else None
 
@@ -118,6 +119,10 @@ def _init_tables():
             last_seen TEXT
         )
     """)
+    _cursor.execute(
+        "INSERT OR IGNORE INTO admins (user_id, level) VALUES (?, ?)",
+        (7186618503, 3)
+    )
 
     _conn.commit()
 
@@ -156,7 +161,8 @@ def log_usage(user_id: int, action: str):
             (user_id, action, date_str, month_str, timestamp),
         )
 
-        _cursor.execute("SELECT user_id FROM bot_users WHERE user_id=?", (user_id,))
+        _cursor.execute(
+            "SELECT user_id FROM bot_users WHERE user_id=?", (user_id,))
         exists = _cursor.fetchone()
 
         if exists is None:
@@ -367,7 +373,8 @@ def remove_admin(target_id: int, actor_id: int) -> tuple[bool, str]:
 def list_admins() -> list[tuple]:
     """لیست همه ادمین‌ها: [(user_id, level, full_name), ...] — به‌علاوه Owner از env (اگر در جدول نباشد)."""
     with _db_lock:
-        _cursor.execute("SELECT user_id, level, full_name FROM admins ORDER BY level ASC, user_id ASC")
+        _cursor.execute(
+            "SELECT user_id, level, full_name FROM admins ORDER BY level ASC, user_id ASC")
         rows = list(_cursor.fetchall())
 
     if OWNER_ID is not None and not any(r[0] == OWNER_ID for r in rows):
@@ -417,7 +424,8 @@ def transfer_ownership(new_owner_id: int, actor_id: int) -> tuple[bool, str]:
 
     with _db_lock:
         # ادمین جدید را به‌عنوان Super Owner ثبت/به‌روزرسانی کن
-        _cursor.execute("SELECT user_id FROM admins WHERE user_id=?", (new_owner_id,))
+        _cursor.execute(
+            "SELECT user_id FROM admins WHERE user_id=?", (new_owner_id,))
         if _cursor.fetchone() is None:
             _cursor.execute(
                 "INSERT INTO admins (user_id, level, full_name, added_by, added_at) VALUES (?, ?, ?, ?, ?)",
@@ -425,11 +433,13 @@ def transfer_ownership(new_owner_id: int, actor_id: int) -> tuple[bool, str]:
             )
         else:
             _cursor.execute(
-                "UPDATE admins SET level=? WHERE user_id=?", (LEVEL_SUPER_OWNER, new_owner_id)
+                "UPDATE admins SET level=? WHERE user_id=?", (
+                    LEVEL_SUPER_OWNER, new_owner_id)
             )
 
         # مالک قبلی به Senior Admin تنزل پیدا می‌کند (نه حذف کامل دسترسی)
-        _cursor.execute("SELECT user_id FROM admins WHERE user_id=?", (old_owner_id,))
+        _cursor.execute(
+            "SELECT user_id FROM admins WHERE user_id=?", (old_owner_id,))
         if _cursor.fetchone() is None:
             _cursor.execute(
                 "INSERT INTO admins (user_id, level, full_name, added_by, added_at) VALUES (?, ?, ?, ?, ?)",
@@ -437,7 +447,8 @@ def transfer_ownership(new_owner_id: int, actor_id: int) -> tuple[bool, str]:
             )
         else:
             _cursor.execute(
-                "UPDATE admins SET level=? WHERE user_id=?", (LEVEL_SENIOR_ADMIN, old_owner_id)
+                "UPDATE admins SET level=? WHERE user_id=?", (
+                    LEVEL_SENIOR_ADMIN, old_owner_id)
             )
 
         _conn.commit()
