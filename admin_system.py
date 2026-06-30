@@ -134,6 +134,21 @@ try:
 except Exception:
     pass
 
+cursor = None
+db_lock = None
+
+
+def init_db(c, lock):
+    global cursor, db_lock
+    cursor = c
+    db_lock = lock
+
+
+def is_admin(user_id):
+    with db_lock:
+        cursor.execute("SELECT 1 FROM admins WHERE user_id=?", (user_id,))
+        return cursor.fetchone() is not None
+
 
 def _now_tehran():
     tehran = pytz.timezone("Asia/Tehran")
