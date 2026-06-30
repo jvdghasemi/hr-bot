@@ -760,6 +760,8 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # حالت ۱: کاربر پیام را فوروارد کرده
 
+        origin = None
+
         if origin and hasattr(origin, "sender_user"):
             target_id = origin.sender_user.id
             full_name = origin.sender_user.first_name or ""
