@@ -153,7 +153,8 @@ async def health_check():
     data["pending"] = len(pending_reply)
 
     try:
-        data["dbsize"] = round(os.path.getsize(database.TICKETS_DB_PATH) / 1024, 2)
+        data["dbsize"] = round(os.path.getsize(
+            database.TICKETS_DB_PATH) / 1024, 2)
     except Exception:
         data["dbsize"] = 0
 
@@ -188,12 +189,14 @@ def build_admin_panel_home(user_id: int):
         f"یکی از گزینه‌های زیر را انتخاب کنید:"
     )
 
-    buttons = [[InlineKeyboardButton("👥 مدیریت ادمین‌ها", callback_data="adm_list")]]
+    buttons = [[InlineKeyboardButton(
+        "👥 مدیریت ادمین‌ها", callback_data="adm_list")]]
 
     # NEW: فقط Owner دکمه‌ی انتقال مالکیت را می‌بیند
     if user_id == admin_system.OWNER_ID:
         buttons.append(
-            [InlineKeyboardButton("👑 انتقال مالکیت", callback_data="adm_transfer_prompt")]
+            [InlineKeyboardButton(
+                "👑 انتقال مالکیت", callback_data="adm_transfer_prompt")]
         )
 
     # NEW: دکمه‌ی تشخیص سیستم (Self-Diagnostics) - فقط برای کسانی که مجوز
@@ -201,7 +204,8 @@ def build_admin_panel_home(user_id: int):
     # هیچ تاثیری روی اجرای عادی ربات ندارد.
     if admin_system.has_permission(user_id, "view_stats") or admin_system.can_manage_admins(user_id):
         buttons.append(
-            [InlineKeyboardButton("🩺 تشخیص سیستم", callback_data="adm_diagnostics")]
+            [InlineKeyboardButton(
+                "🩺 تشخیص سیستم", callback_data="adm_diagnostics")]
         )
 
     markup = InlineKeyboardMarkup(buttons)
@@ -222,7 +226,9 @@ def build_admin_list_view(actor_id: int, page: int = 0):
     خالی با دکمه‌ی «بازگشت» می‌دید — انگار لیست «شکسته» است. اکنون این حالت
     صریحاً تشخیص داده شده و پیام «هیچ ادمینی یافت نشد» نمایش داده می‌شود.
     """
-    admins = admin_system.list_admins()  # NEW: تنها منبع داده -> bot.db/admins (هیچ ADMIN_IDS یا مقدار ثابتی استفاده نمی‌شود)
+    admins = admin_system.list_admins(
+        # NEW: تنها منبع داده -> bot.db/admins (هیچ ADMIN_IDS یا مقدار ثابتی استفاده نمی‌شود)
+    )
 
     if not admins:
         text = (
@@ -231,13 +237,16 @@ def build_admin_list_view(actor_id: int, page: int = 0):
         )
         buttons = []
         if admin_system.can_manage_admins(actor_id):
-            buttons.append([InlineKeyboardButton("➕ افزودن ادمین جدید", callback_data="adm_addprompt")])
-        buttons.append([InlineKeyboardButton("🔙 بازگشت", callback_data="adm_home")])
+            buttons.append([InlineKeyboardButton(
+                "➕ افزودن ادمین جدید", callback_data="adm_addprompt")])
+        buttons.append([InlineKeyboardButton(
+            "🔙 بازگشت", callback_data="adm_home")])
         return text, InlineKeyboardMarkup(buttons)
 
     # ── Pagination (در صورت بیش از ۱۰ ادمین) ──
     total = len(admins)
-    total_pages = max(1, (total + ADMIN_LIST_PAGE_SIZE - 1) // ADMIN_LIST_PAGE_SIZE)
+    total_pages = max(1, (total + ADMIN_LIST_PAGE_SIZE - 1) //
+                      ADMIN_LIST_PAGE_SIZE)
     page = max(0, min(page, total_pages - 1))
 
     start = page * ADMIN_LIST_PAGE_SIZE
@@ -247,23 +256,29 @@ def build_admin_list_view(actor_id: int, page: int = 0):
     for uid, level, full_name in page_admins:
         display_name = admin_system.get_admin_display_name(uid, full_name)
         label = f"👤 {display_name} | 🟡 Level {level} ({admin_system.LEVEL_NAMES.get(level, '?')})"
-        buttons.append([InlineKeyboardButton(label, callback_data=f"adm_view_{uid}")])
+        buttons.append([InlineKeyboardButton(
+            label, callback_data=f"adm_view_{uid}")])
 
     # ── دکمه‌های ناوبری صفحه ──
     if total_pages > 1:
         nav_row = []
         if page > 0:
-            nav_row.append(InlineKeyboardButton("◀️ قبلی", callback_data=f"adm_list_p_{page - 1}"))
-        nav_row.append(InlineKeyboardButton(f"📄 {page + 1}/{total_pages}", callback_data="adm_noop"))
+            nav_row.append(InlineKeyboardButton(
+                "◀️ قبلی", callback_data=f"adm_list_p_{page - 1}"))
+        nav_row.append(InlineKeyboardButton(
+            f"📄 {page + 1}/{total_pages}", callback_data="adm_noop"))
         if page < total_pages - 1:
-            nav_row.append(InlineKeyboardButton("بعدی ▶️", callback_data=f"adm_list_p_{page + 1}"))
+            nav_row.append(InlineKeyboardButton(
+                "بعدی ▶️", callback_data=f"adm_list_p_{page + 1}"))
         buttons.append(nav_row)
 
     # افزودن ادمین جدید فقط برای کسانی که مجوز manage_admins دارند
     if admin_system.can_manage_admins(actor_id):
-        buttons.append([InlineKeyboardButton("➕ افزودن ادمین جدید", callback_data="adm_addprompt")])
+        buttons.append([InlineKeyboardButton(
+            "➕ افزودن ادمین جدید", callback_data="adm_addprompt")])
 
-    buttons.append([InlineKeyboardButton("🔙 بازگشت", callback_data="adm_home")])
+    buttons.append([InlineKeyboardButton(
+        "🔙 بازگشت", callback_data="adm_home")])
 
     text = (
         f"👥 لیست ادمین‌ها ({total} نفر)\n\n"
@@ -278,7 +293,8 @@ def build_admin_detail_view(target_id: int, actor_id: int):
 
     if level is None:
         text = f"کاربر {target_id} ادمین نیست."
-        buttons = [[InlineKeyboardButton("🔙 بازگشت", callback_data="adm_list")]]
+        buttons = [[InlineKeyboardButton(
+            "🔙 بازگشت", callback_data="adm_list")]]
         return text, InlineKeyboardMarkup(buttons)
 
     # NEW: نام نمایشی از روی full_name ثبت‌شده در bot.db (در صورت وجود)، در
@@ -328,9 +344,11 @@ def build_admin_detail_view(target_id: int, actor_id: int):
         for i in range(0, len(level_row), 2):
             buttons.append(level_row[i:i + 2])
 
-        buttons.append([InlineKeyboardButton("🗑 حذف ادمین", callback_data=f"adm_remove_{target_id}")])
+        buttons.append([InlineKeyboardButton(
+            "🗑 حذف ادمین", callback_data=f"adm_remove_{target_id}")])
 
-    buttons.append([InlineKeyboardButton("🔙 بازگشت به لیست", callback_data="adm_list")])
+    buttons.append([InlineKeyboardButton(
+        "🔙 بازگشت به لیست", callback_data="adm_list")])
 
     return text, InlineKeyboardMarkup(buttons)
 
@@ -345,7 +363,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
     # NEW: علاوه بر ADMIN_IDS قدیمی، ادمین‌های ثبت‌شده در admin_system هم مجاز هستند
-    is_legacy_or_new_admin = user_id in ADMIN_IDS or admin_system.is_admin(user_id)
+    is_legacy_or_new_admin = user_id in ADMIN_IDS or admin_system.is_admin(
+        user_id)
 
     if not is_legacy_or_new_admin:
         return
@@ -465,7 +484,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await _safe_alert("❌ داده‌ی دکمه نامعتبر است.")
             return
 
-        success, message = admin_system.remove_admin(target_id=target_id, actor_id=user_id)
+        success, message = admin_system.remove_admin(
+            target_id=target_id, actor_id=user_id)
         await _safe_alert(message)
 
         # بعد از حذف، برگرد به لیست
@@ -522,7 +542,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await _safe_alert("❌ شما مجوز اجرای تشخیص سیستم را ندارید.")
             return
 
-        report = diagnostics.run_system_diagnostics(application=context.application)
+        report = diagnostics.run_system_diagnostics(
+            application=context.application)
         markup = InlineKeyboardMarkup(
             [[InlineKeyboardButton("🔙 بازگشت", callback_data="adm_home")]]
         )
@@ -631,7 +652,8 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ticket_id = pending_reply[user_id]
 
         with db_lock:
-            cursor.execute("SELECT * FROM tickets WHERE ticket_id=?", (ticket_id,))
+            cursor.execute(
+                "SELECT * FROM tickets WHERE ticket_id=?", (ticket_id,))
             ticket = cursor.fetchone()
 
         if ticket is None:
@@ -674,13 +696,15 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # BUGFIX: اگر ارسال پیام اطلاع‌رسانی به گروه ادمین به هر دلیلی
             # (مثلاً ربات از گروه حذف شده) شکست بخورد، نباید جلوی بسته شدن
             # تیکت و پاک شدن pending_reply را بگیرد.
-            logging.exception("Failed to notify admin group about closed ticket")
+            logging.exception(
+                "Failed to notify admin group about closed ticket")
 
         # BUGFIX: conn.commit() قبلاً بیرون از db_lock اجرا می‌شد که با بقیه‌ی
         # کد ناسازگار بود و ریسک race condition داشت؛ اکنون کل تراکنش
         # (حذف + commit) داخل lock انجام می‌شود.
         with db_lock:
-            cursor.execute("DELETE FROM tickets WHERE ticket_id=?", (ticket_id,))
+            cursor.execute(
+                "DELETE FROM tickets WHERE ticket_id=?", (ticket_id,))
             conn.commit()
 
         del pending_reply[user_id]
@@ -702,8 +726,11 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         new_owner_id = None
-        if update.message.forward_from:
-            new_owner_id = update.message.forward_from.id
+        origin = update.message.forward_origin
+
+        if origin and hasattr(origin, "sender_user"):
+            new_owner_id = origin.sender_user.id
+
         else:
             try:
                 new_owner_id = int(text.strip())
@@ -732,9 +759,11 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         full_name = ""
 
         # حالت ۱: کاربر پیام را فوروارد کرده
-        if update.message.forward_from:
-            target_id = update.message.forward_from.id
-            full_name = update.message.forward_from.first_name or ""
+
+        if origin and hasattr(origin, "sender_user"):
+            target_id = origin.sender_user.id
+            full_name = origin.sender_user.first_name or ""
+
         else:
             # حالت ۲: کاربر آیدی عددی را تایپ کرده
             try:
@@ -763,7 +792,8 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
             )
 
-        rows = [level_buttons[i:i + 2] for i in range(0, len(level_buttons), 2)]
+        rows = [level_buttons[i:i + 2]
+                for i in range(0, len(level_buttons), 2)]
         rows.append([InlineKeyboardButton("❌ لغو", callback_data="adm_list")])
 
         await update.message.reply_text(
@@ -1181,7 +1211,8 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     global LAST_ERROR
     LAST_ERROR = str(context.error)
-    logging.exception("Unhandled exception while processing update", exc_info=context.error)
+    logging.exception(
+        "Unhandled exception while processing update", exc_info=context.error)
 
 
 def main():
