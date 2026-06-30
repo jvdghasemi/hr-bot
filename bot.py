@@ -691,7 +691,9 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(
                 chat_id=ADMIN_GROUP_ID,
                 text=f"✅ تیکت #{ticket_id} پاسخ داده و بسته شد.",
+                reply_markup=get_markup(user_id),
             )
+
         except Exception:
             # BUGFIX: اگر ارسال پیام اطلاع‌رسانی به گروه ادمین به هر دلیلی
             # (مثلاً ربات از گروه حذف شده) شکست بخورد، نباید جلوی بسته شدن
